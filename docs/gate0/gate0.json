@@ -1,0 +1,25 @@
+{
+ "opengl": {
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.66,
+  "first_frame_s": 0.397,
+  "second_frame_s": 0.059
+ },
+ "tachyon_draft": {
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.43,
+  "first_frame_s": 0.154,
+  "second_frame_s": 0.061
+ },
+ "tachyon_final": {
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.89,
+  "first_frame_s": 0.372,
+  "second_frame_s": 0.304
+ },
+ "draft_renderer": "opengl",
+ "pass": true
+}

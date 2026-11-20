@@ -1,0 +1,19 @@
+# Env `viz` (shared with psa-viz and lilsx-n2). psan2viz itself needs only numpy + scipy;
+# rendering adds matplotlib, OVITO and ffmpeg.
+name: viz
+channels: [conda-forge]
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - matplotlib
+  - pytest
+  - ffmpeg
+  - pillow
+  - libopengl
+  - libegl
+  - libgl
+  - pip
+  - pip:
+      - ovito==3.17.2
+# after creating: conda env config vars set -n viz LD_LIBRARY_PATH=<env prefix>/lib

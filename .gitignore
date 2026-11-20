@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+scratch/
+# rendered frames and the physics/frame caches (rebuildable)
+frames/
+**/frames/
+cache/
+**/cache/
+# previews: only contact sheets and config snapshots are committed
+previews/**
+!previews/*/
+!previews/*/contact_*.png
+!previews/*/config_*.toml
