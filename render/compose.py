@@ -40,9 +40,11 @@ LAYOUTS = {
         readouts=(1330, 770), footnote=(36, 1070)),
     "B": dict(  # beds close together with one shared profile block between them, dashboard on the right
         name="beds with shared profiles", eq_x=620, title=(36, 24), legend=(1330, 866),
-        beds=[(170, 330, 290, 815), (930, 330, 1050, 815)], prof="shared", label_side=["left", "right"],
+        beds=[(185, 330, 305, 815), (900, 330, 1020, 815)], prof="shared", label_side=["left", "right"],
+        eq_bot_drop=64,  # bottom equalization pipe below the profile x-axis labels
+        train="compact",
         prof_boxes=[(380, 330, 600, 815), (640, 330, 860, 815)],
-        feed_y=965, vent_y=1008, top_y=272, prod_y=212, train_x=40, receiver=(1170, 150, 1230, 290), out="down",
+        feed_y=965, vent_y=1008, top_y=272, prod_y=212, train_x=20, receiver=(1170, 150, 1230, 290), out="down",
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1070)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
@@ -100,7 +102,10 @@ class Composer:
         self.t_cycle = cycle.T
         self.starts = cycle.starts / cycle.T
         fl = [k for k in data.keys() if k.startswith("F0_") or k.startswith("F1_")]
-        self.f_ref = max(float(np.max(np.abs(data[k]))) for k in fl)
+        # arrow scale: the feed flow during production (98th percentile of the feed valves); the short
+        # equalization and pressurization spikes saturate at full width instead of shrinking every other arrow
+        feed = np.abs(np.concatenate([np.asarray(data["F0_feed"]), np.asarray(data["F1_feed"])]))
+        self.f_ref = float(np.percentile(feed[feed > 0], 98)) if np.any(feed > 0) else max(float(np.max(np.abs(data[k]))) for k in fl)
         self._backflow = self._backflow_windows()
         self.nozzles = None  # per bed (y_top, y_bottom) in design px where the 3D nozzles end (draft/final)
         o2max = 100 * max(float(np.max(data["y0"][:, IO2])), float(np.max(data["y1"][:, IO2])))
@@ -228,8 +233,8 @@ class Composer:
         w = 2.0 + 9.0 * math.sqrt(min(a, 1.0))
         if flow < 0:
             p0, p1 = p1, p0
-        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle=f"-|>,head_width={0.45 * w * self.s:.2f},head_length={0.7 * w * self.s:.2f}",
-                                     mutation_scale=10, lw=w * self.s, color=color, alpha=0.35 + 0.65 * min(1, 4 * a),
+        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle=f"-|>,head_width={1.1 * w * self.s:.2f},head_length={1.3 * w * self.s:.2f}",
+                                     mutation_scale=1, lw=w * self.s, color=color, alpha=0.35 + 0.65 * min(1, 4 * a),
                                      zorder=8, shrinkA=0, shrinkB=0))
 
     def _pid(self, fig, fr):
@@ -250,7 +255,7 @@ class Composer:
         else:
             y_tops = [b[1] - 14 for b in beds]
             y_bot = beds[0][3] + 14
-        node_b = y_bot + 30
+        node_b = y_bot + L.get("eq_bot_drop", 30)
         split_b = node_b + 26
         node_t = ty
         split_t = node_t - 20
@@ -265,7 +270,8 @@ class Composer:
         self._valve(ax, mid, node_b, fr["open0_eq_bot"], vertical=False)
         # feed header (gaps where the vent drops cross it)
         tx = L["train_x"]
-        x_in = tx + 300
+        compact = L.get("train") == "compact"  # layout B: bed 1's feed drop sits left of the full-width train
+        x_in = tx + (170 if compact else 300)
         x_end = cx[1] - dx
         cuts = sorted(h for h in (cx[0] + dx, cx[1] + dx) if x_in < h < x_end)
         x = x_in
@@ -276,14 +282,24 @@ class Composer:
         vx = max(cx[1] + dx, beds[1][2]) + 90
         ax.plot([cx[0] + dx, vx], [vy, vy], **pipe)
         # feed train (context, not simulated)
-        self._compressor(ax, tx + 34, fy)
-        self._vessel(ax, tx + 116, fy - 50, 30, 78, None)
-        ax.plot([tx + 60, tx + 101], [fy, fy], **pipe)
-        ax.plot([tx + 131, tx + 176], [fy, fy], **pipe)
-        self._box_icon(ax, tx + 176, fy - 22, 64, 44, "dryer")
-        ax.plot([tx + 240, x_in], [fy, fy], **pipe)
-        self.text(fig, tx, fy + 34, "compressor, air receiver, dryer\n7.5 barg, dew point +3 °C (context only)",
-                  size=10, color=T["muted"], linespacing=1.3)
+        if compact:
+            self._compressor(ax, tx + 24, fy)
+            self._vessel(ax, tx + 77, fy - 45, 26, 70, None)
+            ax.plot([tx + 48, tx + 64], [fy, fy], **pipe)
+            ax.plot([tx + 90, tx + 100], [fy, fy], **pipe)
+            self._box_icon(ax, tx + 100, fy - 20, 52, 40, "dryer", small=True)
+            ax.plot([tx + 152, x_in], [fy, fy], **pipe)
+            self.text(fig, tx, vy + 18, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
+                      size=10, color=T["muted"])
+        else:
+            self._compressor(ax, tx + 34, fy)
+            self._vessel(ax, tx + 116, fy - 50, 30, 78, None)
+            ax.plot([tx + 60, tx + 101], [fy, fy], **pipe)
+            ax.plot([tx + 131, tx + 176], [fy, fy], **pipe)
+            self._box_icon(ax, tx + 176, fy - 22, 64, 44, "dryer")
+            ax.plot([tx + 240, x_in], [fy, fy], **pipe)
+            self.text(fig, tx, fy + 34, "compressor, air receiver, dryer\n7.5 barg, dew point +3 °C (context only)",
+                      size=10, color=T["muted"], linespacing=1.3)
         self._box_icon(ax, vx, vy - 15, 56, 30, "silencer", small=True)
         self.text(fig, vx + 64, vy - 9, "vent", size=11, color=T["muted"])
         # top: nozzles, top equalization, product (left) and purge (right) risers
@@ -329,7 +345,8 @@ class Composer:
             self._arrow(ax, (cx[k] + dx, py + 26), (cx[k] + dx, vt - 2), fr[f"F{k}_purge"], n2c)
         self._arrow(ax, (mid + 36, node_t), (mid + 110, node_t), fr["F0_eq_top"], neut)
         self._arrow(ax, (mid + 36, node_b), (mid + 110, node_b), fr["F0_eq_bot"], neut)
-        self._arrow(ax, (x_in - 56, fy), (x_in - 6, fy), fr["F0_feed"] + fr["F1_feed"], air)
+        if L.get("train") != "compact":  # compact train: no room on the header; the drop arrows show the feed
+            self._arrow(ax, (x_in - 56, fy), (x_in - 6, fy), fr["F0_feed"] + fr["F1_feed"], air)
         self._arrow(ax, (vx - 62, vy), (vx - 8, vy), -(fr["F0_vent"] + fr["F1_vent"]), o2c)
 
     def _compressor(self, ax, x, y):

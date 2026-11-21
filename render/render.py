@@ -212,7 +212,8 @@ def run_draft(args, cfg, cfg_path):
     if renderer == "auto":
         timing = time_renderers(args, cfg)
         renderer = "opengl" if timing["opengl"] <= timing["tachyon_fast"] else "tachyon"
-    outdir = ROOT / "frames" / f"{h}_draft_{tier['theme']}"
+    # keyed by version too: the config can stay the same while the drawing code changes (v03 reused v02 frames)
+    outdir = ROOT / "frames" / f"{ver}_{h}_draft_{tier['theme']}"
     outdir.mkdir(parents=True, exist_ok=True)
     n_frames = int(round(cfg["timing"]["half_video_knots"][-1] * 2 * tier["fps"]))
     edges = np.linspace(0, n_frames, args.workers + 1).astype(int)
@@ -289,7 +290,7 @@ def run_final(args, cfg, cfg_path):
     n_frames = int(round(cfg["timing"]["half_video_knots"][-1] * 2 * tier["fps"]))
     info = dict(tier="final", version=ver, config_hash=h, themes={})
     for theme in tier["themes"]:
-        outdir = ROOT / "frames" / f"{h}_final_{theme}"
+        outdir = ROOT / "frames" / f"{ver}_{h}_final_{theme}"
         outdir.mkdir(parents=True, exist_ok=True)
         edges = np.linspace(0, n_frames, args.workers + 1).astype(int)
         env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
