@@ -104,7 +104,9 @@ draft renderer (report which renderer worked); initial commit made.
 - **G1d symmetry:** at CSS, bed 2 at time t equals bed 1 at t + t_cycle/2
   (max relative difference < 1e-4).
 - **G1e grid:** going from N to 2N cells changes product O₂ by < 5 % (relative)
-  and N₂ recovery by < 1 pp.
+  and N₂ recovery by < 1 pp. User decision (2026-11-20, after 60 cells failed): keep psa-viz's
+  first-order upwind scheme and refine the grid: N = 180 CMS cells (+ 30 alumina cells),
+  checked against 360 (+ 60); about 8-10 h of compute accepted.
 - **G1f sanity:** product O₂ ≤ 0.5 %; the air factor (feed air / product, molar)
   in 2.0–3.5 (BOGE datasheet 2.9 at 99.5 %, Marcinek 3.1–3.2 at 99.9 %; flag it
   if outside); the H₂O front stays inside the alumina layer and the product CO₂

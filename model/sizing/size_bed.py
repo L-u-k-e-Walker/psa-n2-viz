@@ -38,6 +38,9 @@ ap.add_argument("--start", default='{"h_cms": 0.60, "h_al": 0.06, "cv_purge": 2.
 ap.add_argument("--warm", default=None)
 ap.add_argument("--max-iter", type=int, default=8)
 ap.add_argument("--m", type=int, default=20)
+ap.add_argument("--tol", type=float, default=1e-5, help="CSS tolerance for the sizing iterations")
+ap.add_argument("--slope", type=float, default=-6.0, help="first guess of d ln(O2) / d h_cms (1/m)")
+ap.add_argument("--out", default="runs", help="subfolder for the iteration states")
 a = ap.parse_args()
 logf = open(HERE / "sizing.log", "a")
 
@@ -49,14 +52,17 @@ def log(msg):
 
 
 params = json.loads(a.start)
-x0 = np.load(Path(a.warm) / "css_state.npz")["x_start"] if a.warm else None
+x0 = None
+if a.warm:
+    w = Path(a.warm)
+    x0 = np.load(w) if w.suffix == ".npy" else np.load(w / "css_state.npz")["x_start"]
 history = []
 for it in range(1, a.max_iter + 1):
     case = n2_generator_case(**SOLVER, **params)
     pl = Plant(case)
     log(f"iter {it}: {json.dumps(params)}")
     t0 = time.time()
-    x, hist = pl.run_to_css_proj(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=2e-7,
+    x, hist = pl.run_to_css_proj(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=a.tol,
                                  plain=0 if x0 is not None else 12,
                                  progress=lambda h: log(f"    {h['kind']} {h['iter']:3d} rms {h['rms']:.2e} maps {h['maps']} "
                                                         f"{h['wall_s']:.0f}s {h.get('note', '')}"))
@@ -73,7 +79,7 @@ for it in range(1, a.max_iter + 1):
                h2o_front_zL=z_front, alumina_top_zL=cyc.z_al, h2o_cms_max_rel=q_cms, css_iterations=len(hist),
                css_change_rms=rms, wall_s=time.time() - t0, p_tank_min=None)
     history.append(rec)
-    css.save(dict(case=case, x=x, hist=hist, metrics=met), HERE / "runs" / f"iter{it:02d}")
+    css.save(dict(case=case, x=x, hist=hist, metrics=met), HERE / a.out / f"iter{it:02d}")
     log("  -> " + json.dumps({k: (round(v, 5) if isinstance(v, float) else v) for k, v in rec.items() if k != "params"}))
     ok_o2 = abs(met["product_O2_ppm"] / O2_TARGET - 1) < O2_TOL
     ok_purge = abs(purge_step / purge_target - 1) < 0.03
@@ -89,9 +95,10 @@ for it in range(1, a.max_iter + 1):
     if len(pts) >= 2 and abs(pts[-1][0] - pts[-2][0]) > 1e-4:
         slope = (pts[-1][1] - pts[-2][1]) / (pts[-1][0] - pts[-2][0])
     else:
-        slope = -6.0  # 1/m, first guess (ln O2 per metre of CMS)
+        slope = a.slope  # 1/m, first guess (ln O2 per metre of CMS)
     slope = min(slope, -1.0)
     dh = (math.log(O2_TARGET) - pts[-1][1]) / slope
     params["h_cms"] = round(float(np.clip(params["h_cms"] + dh, 0.5 * params["h_cms"], 1.6 * params["h_cms"])), 4)
     x0 = x
-(HERE / "sizing.json").write_text(json.dumps(dict(target_O2_ppm=O2_TARGET, history=history, final=history[-1]), indent=1))
+(HERE / f"sizing_{a.out}.json").write_text(json.dumps(dict(target_O2_ppm=O2_TARGET, history=history, final=history[-1]),
+                                                       indent=1))

@@ -143,3 +143,43 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   fifth map a vector-Aitken jump of the CO2 and H2O loadings by the rest of their geometric series,
   lam/(1-lam) d2 (cosine >= 0.95, lam in (0, 1), at most 3000 cycles). The gates verify the result
   with plain full cycles, so the acceleration cannot bias it.
+
+### Model diagnostics before sizing (starting geometry: 2 x 5.2 L beds, 0.60 m CMS + 0.06 m alumina)
+- Near-CSS performance at 60 CMS cells: product O2 35,700 ppm (96.4 % N2 + Ar), air factor 2.37,
+  N2 recovery 51.6 %, productivity 177 Nm3/h per m3 CMS. The O2 working capacity of one bed per
+  half-cycle (~0.72 mol) barely exceeds the O2 fed (~0.62 mol); Marcinek's pilot runs at a ratio
+  ~1.5 for 1000 ppm. The beds must be longer for 0.5 % O2.
+- Rate law check: Marcinek's QDF + Darken law with his zero-loading constants, in a copy of the
+  kernel, gives 38,300 ppm (vs 35,700 with the fitted LDF + Darken): the fitted LDF is faithful,
+  not the cause of the low purity.
+- Grid: first-order upwind at 60 vs 120 CMS cells: product O2 35,665 vs 32,383 ppm after 12 cycles
+  (-9.2 % and still falling); N2 recovery +0.08 pp. G1e (5 %) fails at 60 cells. Cause: the
+  scheme's numerical dispersion (Peclet 2N = 120) is ~7x a packed-bed correlation's
+  (D_L = 0.7 D_m + 0.5 d_p u_i: Pe ~900).
+- van Albada TVD face values (smooth limiter) in a copy of the kernel: mass balance exact, but
+  ~12x slower per cycle (85 s vs 7 s at 60 cells), and a per-species nonlinear limiter does not
+  keep the face mole fractions summing to one (it would have to act on mole fractions). The
+  option stays in the kernel (default upwind; tests/test_scheme.py) but is not used.
+- Asked the user (G1e failing needs a decision): finer upwind grid with the strict 5 % limit
+  (180 vs 360 CMS cells) chosen.
+- Exact Jacobian sparsity pattern for BDF (sparse LU): same results (3.5e-7 scaled), but slower
+  than dense LAPACK at 60 cells (4.3 vs 2.6 s per half-cycle) and at 180 cells (150 vs 54 s).
+  Removed; dense LU kept.
+- CO2 rate on the CMS: the assumed 0.01 /s let CO2 slip through kinetically (77 ppm in the
+  product); changed to 0.1 x O2 = 0.15 /s (CO2 is a small linear molecule, reported on CMS as far
+  faster than N2; still an assumption, docs/INPUTS.md).
+
+### Alumina layer kinetics (first sizing iteration)
+- At the starting geometry (6 cm alumina, 2.4 mm beads, water LDF 6.6e-5 /s from Knudsen diffusion in
+  5.7 nm mesopores) the CSS water profile filled the alumina at 4.1-4.2 mol/kg (92 % of its feed
+  loading, unchanged over the cycle) and spread through the CMS: y_H2O >= 1 % of the feed up to
+  z/L 0.88, CMS water loading up to 74 % of its feed equilibrium. With a solid-side rate that slow the
+  layer exchanges < 1 % of its driving force per half-cycle, so it cannot regenerate in blowdown and
+  purge and a thicker layer would not help.
+- A search for literature LDF values of water on activated alumina found none that could be verified
+  (a search summary attributed "125-400 1/s" to US 6,605,136, but the patent text has no such value;
+  not used). The patent's macropore formula, K = 60 eps_p (1 - eps_b) D_p / d_p^2, gives ~0.9 1/s
+  (gas side) for the 2.4 mm beads, consistent with the Glueckauf estimate.
+- Changed two assumptions, as a design choice for a PSA pretreatment layer: 14x28 mesh beads (1.2 mm)
+  and macropore (molecular) diffusion control for the bidisperse alumina. Water LDF 1.52e-3 /s (23x),
+  CO2 0.054, N2/O2/Ar 2.6-6.0 /s. docs/INPUTS.md states both and why.

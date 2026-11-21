@@ -233,13 +233,19 @@ out["cms_kinetics"] = dict(
     swing_test=dict(P_high_bar=P_H, P_low_bar=P_L, half_s=t_half, y_air=y_air),
     swing_amplitude_mol_kg={"qdf": amp_ref.tolist(), "ldf_fit": amp.tolist()},
     swing_traj_max_rel_err=float(np.max(np.abs(ldf - ref) / amp_ref[:, None])),
-    k0_CO2=0.01, k0_H2O=0.01,
+    k0_CO2=0.1 * float(k0[0]), k0_H2O=0.01,
     source="k0 fitted so that the LDF+Darken pellet follows Marcinek's QDF+Darken+Arrhenius model (M21d Tab. 3.5-1) "
            "through a square-wave air swing; Ar = N2 (assumed: Ar/N2 rate ratios on CMS in the literature lie on both "
-           "sides of 1); CO2 and H2O 0.01 /s (assumed: slow micropore uptake, minutes; neither reaches the product)")
+           "sides of 1); CO2 = 0.1 x O2 (assumed: a small linear molecule, reported on CMS as far faster than N2 but "
+           "slower than O2; no rate constant for CT-350 was reachable); H2O 0.01 /s (assumed; water stays in the alumina, G1f)")
 
 # ---------------------------------------------------------------- alumina kinetics (Glueckauf)
-BEAD = dict(radius=1.2e-3, porosity=0.55, density=1250.0, pore_d=5.7e-9, tortuosity=3.0)  # assumed (F-200-like beads)
+# Assumed (F-200-like beads): 14x28 mesh (mean diameter ~1.2 mm), the small beads used in fast-cycle PSA
+# pretreatment layers; activated alumina is bidisperse, so uptake is controlled by molecular diffusion in the
+# macropores (tortuosity 3). A first assumption (7x12 mesh, 2.4 mm, Knudsen diffusion in the 5.7 nm mesopores)
+# gave a water LDF of 6.6e-5 /s: the layer could not regenerate within a 120 s cycle, saturated, and passed the
+# water into the CMS (docs/LOG.md).
+BEAD = dict(radius=0.6e-3, porosity=0.55, density=1250.0, pore_d=5.7e-9, tortuosity=3.0, transport="macropore")
 M = {"N2": 0.028, "O2": 0.032, "Ar": 0.040, "CO2": 0.044, "H2O": 0.018}
 D_air_1bar = {"N2": 2.0e-5, "O2": 2.0e-5, "Ar": 1.9e-5, "CO2": 1.6e-5, "H2O": 2.4e-5}  # m^2/s at 293 K, 1 bar (assumed)
 P_mid = 4.5  # bar, cycle-average pressure for the molecular diffusivity
@@ -247,9 +253,8 @@ y_feed_wet = {"N2": 0.78078, "O2": 0.20946, "Ar": 0.00934, "CO2": 0.00042, "H2O"
 P_feed = 8.51325
 k_alu, slopes = {}, {}
 for s in SP:
-    Dk = BEAD["pore_d"] / 3 * math.sqrt(8 * R * T / (math.pi * M[s]))
     Dm = D_air_1bar[s] / P_mid
-    De = BEAD["porosity"] / BEAD["tortuosity"] / (1 / Dk + 1 / Dm)
+    De = BEAD["porosity"] / BEAD["tortuosity"] * Dm  # macropore (molecular) diffusion controls
     a = alu[s]
     p = y_feed_wet[s] * P_feed
     qs_, b_ = np.atleast_1d(a["qs"]), np.atleast_1d(a["b"])
@@ -259,8 +264,8 @@ for s in SP:
     slopes[s] = slope
     k_alu[s] = 15 * De / (BEAD["radius"] ** 2 * (BEAD["porosity"] + BEAD["density"] * slope))
 out["alumina_kinetics"] = dict(k_per_s=k_alu, chord_slope_m3_kg=slopes, bead=BEAD, P_mid_bar=P_mid,
-                               source="Glueckauf LDF from macropore diffusion (Bosanquet of Knudsen and molecular), "
-                                      "chord from a clean bead to the feed partial pressure; bead data assumed (F-200-like)")
+                               source="Glueckauf LDF from macropore (molecular) diffusion, D_e = eps_p D_m / tau, chord from a "
+                                      "clean bead to the feed partial pressure; bead data assumed (F-200-like 14x28 mesh)")
 def site_arrays(block, site_of):
     qs_a, b_a = np.zeros((5, 2)), np.zeros((5, 2))
     for i, s in enumerate(SP):

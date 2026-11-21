@@ -174,17 +174,17 @@
    ]
   },
   "swing_traj_max_rel_err": 0.5749412364754186,
-  "k0_CO2": 0.01,
+  "k0_CO2": 0.15149718949686525,
   "k0_H2O": 0.01,
-  "source": "k0 fitted so that the LDF+Darken pellet follows Marcinek's QDF+Darken+Arrhenius model (M21d Tab. 3.5-1) through a square-wave air swing; Ar = N2 (assumed: Ar/N2 rate ratios on CMS in the literature lie on both sides of 1); CO2 and H2O 0.01 /s (assumed: slow micropore uptake, minutes; neither reaches the product)"
+  "source": "k0 fitted so that the LDF+Darken pellet follows Marcinek's QDF+Darken+Arrhenius model (M21d Tab. 3.5-1) through a square-wave air swing; Ar = N2 (assumed: Ar/N2 rate ratios on CMS in the literature lie on both sides of 1); CO2 = 0.1 x O2 (assumed: a small linear molecule, reported on CMS as far faster than N2 but slower than O2; no rate constant for CT-350 was reachable); H2O 0.01 /s (assumed; water stays in the alumina, G1f)"
  },
  "alumina_kinetics": {
   "k_per_s": {
-   "N2": 0.25275537980894963,
-   "O2": 0.14473793189583203,
-   "Ar": 0.09910827756860345,
-   "CO2": 0.0022507437407183898,
-   "H2O": 6.57117075934077e-05
+   "N2": 6.034114266973608,
+   "O2": 3.6539800866425516,
+   "Ar": 2.632863076280892,
+   "CO2": 0.053860380331386924,
+   "H2O": 0.0015193165446543788
   },
   "chord_slope_m3_kg": {
    "N2": 0.0040611566943333285,
@@ -194,14 +194,15 @@
    "H2O": 21.451700903268396
   },
   "bead": {
-   "radius": 0.0012,
+   "radius": 0.0006,
    "porosity": 0.55,
    "density": 1250.0,
    "pore_d": 5.7e-09,
-   "tortuosity": 3.0
+   "tortuosity": 3.0,
+   "transport": "macropore"
   },
   "P_mid_bar": 4.5,
-  "source": "Glueckauf LDF from macropore diffusion (Bosanquet of Knudsen and molecular), chord from a clean bead to the feed partial pressure; bead data assumed (F-200-like)"
+  "source": "Glueckauf LDF from macropore (molecular) diffusion, D_e = eps_p D_m / tau, chord from a clean bead to the feed partial pressure; bead data assumed (F-200-like 14x28 mesh)"
  },
  "solver_params": {
   "order": [
@@ -261,7 +262,7 @@
     0.0032936364963114476,
     1.5149718949686524,
     0.0032936364963114476,
-    0.01,
+    0.15149718949686525,
     0.01
    ],
    "darken": true,
@@ -313,11 +314,11 @@
     ]
    ],
    "k0": [
-    0.25275537980894963,
-    0.14473793189583203,
-    0.09910827756860345,
-    0.0022507437407183898,
-    6.57117075934077e-05
+    6.034114266973608,
+    3.6539800866425516,
+    2.632863076280892,
+    0.053860380331386924,
+    0.0015193165446543788
    ],
    "darken": false,
    "single_site_placement": "N2, O2, Ar on site 1 (not displaced by water's strong site); CO2 and H2O dual-site"

@@ -18,6 +18,11 @@ valves per bed end:
   FEED and PURGE steps; used for the regression gate G1c).
 * End molar flows are sums over the open valves at that end; inflowing gas carries
   its source's composition, outflowing gas the end cell's composition.
+* Face concentrations at internal faces: ``scheme="upwind"`` (first order, psa-viz's scheme;
+  used by the regression gate G1c) or ``scheme="vanalbada"``: upwind plus a van Albada limited
+  correction, c_f = c_U + (1/2) [(a^2 + e) b + (b^2 + e) a] / (a^2 + b^2 + 2e) with a = c_U - c_UU,
+  b = c_D - c_U (second order where the profile is smooth, no new extrema, differentiable, so
+  it suits the implicit integrator). Fluxes stay in conservation form either way.
 """
 from __future__ import annotations
 
@@ -42,8 +47,12 @@ class Layer:
 class BedGrid:
     """Cells, per-cell parameters and the rate kernel of one bed (cell 0 = feed end, bottom)."""
 
-    def __init__(self, layers, radius, temperature):
+    def __init__(self, layers, radius, temperature, scheme="upwind", va_eps=None):
         self.layers = list(layers)
+        if scheme not in ("upwind", "vanalbada"):
+            raise ValueError(scheme)
+        self.scheme = scheme
+        self.va_eps2 = None if va_eps is None else (np.asarray(va_eps, float)[:, None, None]) ** 2
         self.radius = float(radius)
         self.area = math.pi * radius**2
         self.T = float(temperature)
@@ -150,7 +159,18 @@ class BedGrid:
         else:
             raise ValueError("bad end specification")
         flux = np.empty((self.n, N + 1, K))
-        flux[:, 1:N] = u[1:N] * np.where(u[1:N] >= 0.0, c[:, :N - 1], c[:, 1:])
+        if self.scheme == "upwind":
+            flux[:, 1:N] = u[1:N] * np.where(u[1:N] >= 0.0, c[:, :N - 1], c[:, 1:])
+        else:
+            cp = np.concatenate([c[:, :1], c, c[:, -1:]], axis=1)  # zero-gradient ghost cells
+            up = u[1:N] >= 0.0
+            cU = np.where(up, cp[:, 1:N], cp[:, 2:N + 1])
+            cUU = np.where(up, cp[:, 0:N - 1], cp[:, 3:N + 2])
+            cD = np.where(up, cp[:, 2:N + 1], cp[:, 1:N])
+            da, db = cU - cUU, cD - cU
+            e2 = self.va_eps2 if self.va_eps2 is not None else 1e-30
+            corr = ((da * da + e2) * db + (db * db + e2) * da) / (da * da + db * db + 2.0 * e2)
+            flux[:, 1:N] = u[1:N] * (cU + 0.5 * corr)
         if bot[0] == "valves":
             flux[:, 0] = bot[2] / a
         else:

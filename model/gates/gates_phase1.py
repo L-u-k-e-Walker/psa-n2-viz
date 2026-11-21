@@ -17,7 +17,10 @@ from psan2viz.analysis import Cycle  # noqa: E402
 from psan2viz.cases import P_DELIVER  # noqa: E402
 
 res = {}
-case, pl, x = css.load(ROOT / "model" / "css" / "final")
+CSS_FINAL = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "model" / "css" / "final"
+GRID_2N = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "model" / "grid" / "2N"
+OUT_JSON = HERE / ("gates_phase1.json" if len(sys.argv) == 1 else "gates_dryrun.json")
+case, pl, x = css.load(CSS_FINAL)
 x_end, recs = pl.run_cycle(x)
 met = pl.cycle_metrics(recs)
 feed = np.array(met["feed_mol"])
@@ -55,7 +58,7 @@ res["G1d"] = dict(max_scaled_diff=sym, limit=1e-4, pass_=sym < 1e-4)
 res["G1d"]["pass"] = res["G1d"].pop("pass_")
 
 # ---- G1e: grid (N vs 2N)
-g2 = ROOT / "model" / "grid" / "2N" / "metrics.json"
+g2 = GRID_2N / "metrics.json"
 if g2.exists():
     m2 = json.loads(g2.read_text())
     dO2 = abs(m2["product_O2_ppm"] / met["product_O2_ppm"] - 1)
@@ -90,8 +93,8 @@ res["psa_sim_crosscheck"] = ("skipped: psa-sim supports several columns, equaliz
                             "(no simultaneous top+bottom equalization, no layered bed, no bidirectional product valve / "
                             "back-flow, no Darken LDF); per docs/MISSION.md")
 g1c = json.loads((ROOT / "model" / "regression" / "g1c.json").read_text())
-res["G1c"] = dict(source="model/regression/g1c.json", max_diff_rtol_1e-9=g1c["rtol_1e-09"]["max_diff"], pass_=g1c["G1c_pass"])
+res["G1c"] = {"source": "model/regression/g1c.json", "max_diff_rtol_1e-9": g1c["rtol_1e-09"]["max_diff"], "pass_": g1c["G1c_pass"]}
 res["G1c"]["pass"] = res["G1c"].pop("pass_")
 res["all_pass"] = all(v.get("pass") is True for k, v in res.items() if isinstance(v, dict))
-(HERE / "gates_phase1.json").write_text(json.dumps(res, indent=1, default=float))
+OUT_JSON.write_text(json.dumps(res, indent=1, default=float))
 print(json.dumps(res, indent=1, default=float))

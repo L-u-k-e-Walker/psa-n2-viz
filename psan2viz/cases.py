@@ -71,10 +71,12 @@ ALU_BULK = (1 - ALU_VOID_INTER) * ALU_RHO_P  # 750 kg/m^3 (F-200 data sheets: ~7
 ALU_VOID = ALU_VOID_INTER + (1 - ALU_VOID_INTER) * ALU_EPS_P  # 0.73 total voidage
 
 
-def bed_grid(h_cms, h_al, radius, n_cms, n_al, params):
+def bed_grid(h_cms, h_al, radius, n_cms, n_al, params, scheme="upwind"):
     cms, alu = sorbents(params)
     layers = [Layer("alumina", alu, h_al, ALU_VOID, ALU_BULK, n_al), Layer("CMS", cms, h_cms, CMS_VOID, CMS_BULK, n_cms)]
-    return BedGrid(layers, radius, T)
+    y = feed_composition()
+    c_ref = P_HEADER * 1e5 / (R_GAS * T) * np.maximum(y, 1e-4)
+    return BedGrid(layers, radius, T, scheme=scheme, va_eps=1e-6 * c_ref)
 
 
 def eq_cv_for(grid, t_eq, residual=0.02):
@@ -90,11 +92,11 @@ def eq_cv_for(grid, t_eq, residual=0.02):
 def n2_generator_case(h_cms=0.60, h_al=0.06, radius=0.05, n_cms=60, n_al=10, t_eq=1.0, t_prod=59.0,
                       cv_feed=0.12, cv_product=0.06, cv_vent=0.15, cv_purge=2.5e-4, cv_eq=None,
                       tank_volume=None, product_mol_s=PRODUCT_MOL_S, solver_params=None, fits_path=FITS,
-                      **kw) -> PlantCase:
+                      scheme="upwind", **kw) -> PlantCase:
     """Build the case. ``case_args`` on the result records every argument (and the sorbent
     parameters) so that ``case_from_args`` rebuilds it exactly, e.g. from a cached CSS state."""
     params = load_solver_params(fits_path) if solver_params is None else solver_params
-    grid = bed_grid(h_cms, h_al, radius, n_cms, n_al, params)
+    grid = bed_grid(h_cms, h_al, radius, n_cms, n_al, params, scheme)
     cv_eq = eq_cv_for(grid, t_eq) if cv_eq is None else cv_eq
     tank_volume = 6.0 * grid.volume if tank_volume is None else tank_volume  # M21d: 12 L receiver per 2 L bed
     prov = {
@@ -124,7 +126,7 @@ def n2_generator_case(h_cms=0.60, h_al=0.06, radius=0.05, n_cms=60, n_al=10, t_e
     case = PlantCase(**args)
     case.case_args = dict(h_cms=h_cms, h_al=h_al, radius=radius, n_cms=n_cms, n_al=n_al, t_eq=t_eq, t_prod=t_prod,
                           cv_feed=cv_feed, cv_product=cv_product, cv_vent=cv_vent, cv_purge=cv_purge, cv_eq=cv_eq,
-                          tank_volume=tank_volume, product_mol_s=product_mol_s, solver_params=params,
+                          tank_volume=tank_volume, product_mol_s=product_mol_s, solver_params=params, scheme=scheme,
                           **{k: v for k, v in kw.items() if isinstance(v, (int, float, str))})
     return case
 
