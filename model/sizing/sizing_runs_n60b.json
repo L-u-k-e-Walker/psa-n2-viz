@@ -1,0 +1,131 @@
+{
+ "target_O2_ppm": 4500.0,
+ "history": [
+  {
+   "iter": 1,
+   "params": {
+    "h_cms": 1.16,
+    "h_al": 0.101,
+    "cv_purge": 0.0002397
+   },
+   "O2_ppm": 4383.423927055112,
+   "air_factor": 3.1481235812406516,
+   "recovery_N2": 0.40053333339844394,
+   "purge_step_mol": 0.08867071118485684,
+   "purge_target_mol": 0.1767446113591677,
+   "h2o_front_zL": 0.08009516256938932,
+   "alumina_top_zL": 0.08009516256938934,
+   "h2o_cms_max_rel": 0.04170384372726629,
+   "h2o_interface_y_rel": 0.05483579668033424,
+   "css_iterations": 10,
+   "css_change_rms": 3.753782602013165e-05,
+   "wall_s": 228.53453850746155,
+   "p_tank_min": null
+  },
+  {
+   "iter": 2,
+   "params": {
+    "h_cms": 1.1525,
+    "h_al": 0.1313,
+    "cv_purge": 0.00047778666457823214
+   },
+   "O2_ppm": 3013.606461724415,
+   "air_factor": 3.3031044212613474,
+   "recovery_N2": 0.38227022412024747,
+   "purge_step_mol": 0.17467985078530843,
+   "purge_target_mol": 0.1799403109142738,
+   "h2o_front_zL": 0.10227449758529371,
+   "alumina_top_zL": 0.10227449758529371,
+   "h2o_cms_max_rel": 0.02273784212996508,
+   "h2o_interface_y_rel": 0.030212880413180015,
+   "css_iterations": 100,
+   "css_change_rms": 1.8549229993317283e-05,
+   "wall_s": 1926.298995733261,
+   "p_tank_min": null
+  },
+  {
+   "iter": 3,
+   "params": {
+    "h_cms": 0.7516,
+    "h_al": 0.1707,
+    "cv_purge": 0.0004921751454926922
+   },
+   "O2_ppm": 16890.248999770727,
+   "air_factor": 2.932005812481158,
+   "recovery_N2": 0.4247034797027727,
+   "purge_step_mol": 0.1832741438740128,
+   "purge_target_mol": 0.12927165349449668,
+   "h2o_front_zL": 0.18508077632006936,
+   "alumina_top_zL": 0.18508077632006936,
+   "h2o_cms_max_rel": 0.007644153626822726,
+   "h2o_interface_y_rel": 0.009955118037884141,
+   "css_iterations": 266,
+   "css_change_rms": 6.45333994695339e-06,
+   "wall_s": 4876.147547245026,
+   "p_tank_min": null
+  },
+  {
+   "iter": 4,
+   "params": {
+    "h_cms": 1.0592,
+    "h_al": 0.2219,
+    "cv_purge": 0.0003471536874861721
+   },
+   "O2_ppm": 7133.094489762369,
+   "air_factor": 3.4262936185256,
+   "recovery_N2": 0.36703425177223065,
+   "purge_step_mol": 0.12640245718021711,
+   "purge_target_mol": 0.17956187280906385,
+   "h2o_front_zL": 0.17321052220747796,
+   "alumina_top_zL": 0.173210522207478,
+   "h2o_cms_max_rel": 0.007444967497098257,
+   "h2o_interface_y_rel": 0.00976189372528083,
+   "css_iterations": 12,
+   "css_change_rms": 1.3085360745561352e-05,
+   "wall_s": 217.8742537498474,
+   "p_tank_min": null
+  },
+  {
+   "iter": 5,
+   "params": {
+    "h_cms": 1.2236,
+    "h_al": 0.2885,
+    "cv_purge": 0.0004931515388875327
+   },
+   "O2_ppm": 4028.881759940029,
+   "air_factor": 3.8706445656339556,
+   "recovery_N2": 0.3259121739043403,
+   "purge_step_mol": 0.1750777006147183,
+   "purge_target_mol": 0.2119393551436933,
+   "h2o_front_zL": 0.1907942596389128,
+   "alumina_top_zL": 0.19079425963891283,
+   "h2o_cms_max_rel": 0.006360035836288,
+   "h2o_interface_y_rel": 0.008265620671192433,
+   "css_iterations": 52,
+   "css_change_rms": 9.210756042663631e-06,
+   "wall_s": 928.3114182949066,
+   "p_tank_min": null
+  }
+ ],
+ "final": {
+  "iter": 5,
+  "params": {
+   "h_cms": 1.2236,
+   "h_al": 0.2885,
+   "cv_purge": 0.0004931515388875327
+  },
+  "O2_ppm": 4028.881759940029,
+  "air_factor": 3.8706445656339556,
+  "recovery_N2": 0.3259121739043403,
+  "purge_step_mol": 0.1750777006147183,
+  "purge_target_mol": 0.2119393551436933,
+  "h2o_front_zL": 0.1907942596389128,
+  "alumina_top_zL": 0.19079425963891283,
+  "h2o_cms_max_rel": 0.006360035836288,
+  "h2o_interface_y_rel": 0.008265620671192433,
+  "css_iterations": 52,
+  "css_change_rms": 9.210756042663631e-06,
+  "wall_s": 928.3114182949066,
+  "p_tank_min": null
+ }
+}

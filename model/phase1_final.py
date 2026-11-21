@@ -1,0 +1,88 @@
+"""Phase 1 end, unattended (env viz): final CSS state -> gates -> Gate 3 -> draft on the final physics.
+
+Runs beside model/phase1_chain.py (which does the 180-cell sizing and the 360-cell grid run).
+Steps (logged to model/phase1_final.log; a step whose output exists is skipped, so it can be restarted):
+  1. wait for a sized 180-cell sizing round (model/sizing/sizing_runs_n180*.json, same acceptance as
+     size_bed.py)
+  2. css/trace_css.py from that state -> model/css/final: full-model cycles + frozen-bulk trace marches
+     until one full-model cycle changes the normalized state by < 1e-6 (G1b), integrator rtol 1e-7
+  3. wait for the 360-cell run (model/grid/2N/metrics.json), then gates/gates_phase1.py
+  4. tools/gate3_spotcheck.py on model/css/final
+  5. render/render.py --draft (next version) on model/css/final; the user reviews it (no final render)
+usage: OPENBLAS_NUM_THREADS=6 python phase1_final.py
+"""
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+PY = [sys.executable, "-I"]
+LOG = HERE / "phase1_final.log"
+
+
+def log(msg):
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    print(line, flush=True)
+    with open(LOG, "a") as f:
+        f.write(line + "\n")
+
+
+def run(cmd, cwd, check=True):
+    log("run: " + " ".join(str(c) for c in cmd))
+    t0 = time.time()
+    r = subprocess.run([str(c) for c in cmd], cwd=cwd)
+    log(f"  exit {r.returncode} after {time.time() - t0:.0f} s")
+    if check and r.returncode != 0:
+        sys.exit(r.returncode)
+    return r.returncode
+
+
+def sized(rec):
+    return (abs(rec["O2_ppm"] / 4500.0 - 1) < 0.03 and abs(rec["purge_step_mol"] / rec["purge_target_mol"] - 1) < 0.03
+            and rec["h2o_cms_max_rel"] < 0.05 and rec["h2o_interface_y_rel"] < 0.05)
+
+
+def find_sized():
+    for js in sorted((HERE / "sizing").glob("sizing_runs_n180*.json")):
+        d = json.loads(js.read_text())
+        if sized(d["final"]):
+            out = js.stem[len("sizing_"):]
+            return HERE / "sizing" / out / f"iter{d['final']['iter']:02d}", d["final"]
+    return None, None
+
+
+final = HERE / "css" / "final"
+if not (final / "metrics.json").exists():
+    log("waiting for a sized 180-cell state")
+    src, rec = find_sized()
+    while src is None:
+        time.sleep(60)
+        src, rec = find_sized()
+    log(f"sized 180-cell state {src}: {rec['params']}, O2 {rec['O2_ppm']:.0f} ppm")
+    run(PY + [HERE / "css" / "trace_css.py", src, final, "--tol", "1e-6", "--rtol", "1e-7", "--march-max", "3000"],
+        HERE / "css")
+met = json.loads((final / "metrics.json").read_text())
+log(f"final state: O2 {met['product_O2_ppm']:.0f} ppm, CSS change rms {met['css_change_rms']:.2e}, converged {met['converged']}")
+
+if not (HERE / "gates" / "gates_phase1.json").exists():
+    log("waiting for the 360-cell run (model/grid/2N/metrics.json)")
+    while not (HERE / "grid" / "2N" / "metrics.json").exists():
+        time.sleep(60)
+    run(PY + [HERE / "gates" / "gates_phase1.py"], HERE / "gates", check=False)
+g = json.loads((HERE / "gates" / "gates_phase1.json").read_text())
+log("gates: " + ", ".join(f"{k} {'PASS' if v.get('pass') else ('n/a' if v.get('pass') is None else 'FAIL')}"
+                          for k, v in sorted(g.items())))
+
+if not (ROOT / "docs" / "gate3_final.json").exists():
+    run(PY + [ROOT / "tools" / "gate3_spotcheck.py", final], ROOT, check=False)
+    (ROOT / "docs" / "gate3_final.json").write_text((ROOT / "docs" / "gate3_spotcheck.json").read_text())
+log("gate 3: " + (ROOT / "docs" / "gate3_final.json").read_text().replace("\n", " ")[:300])
+
+done = HERE / "phase1_final.draft_done"
+if not done.exists():
+    run(PY + [ROOT / "render" / "render.py", "--draft", "--css", final, "--workers", "6"], ROOT, check=False)
+    done.write_text(time.strftime("%Y-%m-%d %H:%M:%S"))
+log("phase 1 final driver done")

@@ -1,0 +1,53 @@
+{
+ "target_O2_ppm": 4500.0,
+ "history": [
+  {
+   "iter": 1,
+   "O2_ppm": 1283.6157,
+   "air_factor": 3.1831,
+   "recovery_N2": 0.39738,
+   "purge_step_mol": 0.16374,
+   "purge_target_mol": 0.16759,
+   "h2o_front_zL": 0.10981,
+   "alumina_top_zL": 0.10981,
+   "h2o_cms_max_rel": 0.01731,
+   "h2o_interface_y_rel": 0.02244,
+   "css_iterations": 8,
+   "css_change_rms": 5e-05,
+   "wall_s": 3770.886,
+   "p_tank_min": null,
+   "params": {
+    "h_cms": 1.0644,
+    "h_al": 0.1313,
+    "cv_purge": 0.0004449092000425925,
+    "n_al": 30,
+    "n_cms": 180
+   },
+   "note": "round 0: iteration 2 (0.7047 m) stalled 6 h in the slow water mode at the 5e-5 target; continued as runs_n180a"
+  }
+ ],
+ "final": {
+  "iter": 1,
+  "O2_ppm": 1283.6157,
+  "air_factor": 3.1831,
+  "recovery_N2": 0.39738,
+  "purge_step_mol": 0.16374,
+  "purge_target_mol": 0.16759,
+  "h2o_front_zL": 0.10981,
+  "alumina_top_zL": 0.10981,
+  "h2o_cms_max_rel": 0.01731,
+  "h2o_interface_y_rel": 0.02244,
+  "css_iterations": 8,
+  "css_change_rms": 5e-05,
+  "wall_s": 3770.886,
+  "p_tank_min": null,
+  "params": {
+   "h_cms": 1.0644,
+   "h_al": 0.1313,
+   "cv_purge": 0.0004449092000425925,
+   "n_al": 30,
+   "n_cms": 180
+  },
+  "note": "round 0: iteration 2 (0.7047 m) stalled 6 h in the slow water mode at the 5e-5 target; continued as runs_n180a"
+ }
+}

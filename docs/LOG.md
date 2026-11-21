@@ -269,3 +269,17 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   (numerical Peclet 2N), so it under-predicts purity by 3.5x at this design: the reason for the finer
   grid (G1e). Next: 0.705 m. The chain now runs sizing rounds (runs_n180, runs_n180a, ...) until the
   acceptance holds, restarting each round from the last point with the slope measured at 180 cells.
+- Trace march at 60 cells finished (runs/trace60, sized 60-cell design): 4 outer rounds, ~10,200 trace
+  cycles in 2.5 h; a verified full-model cycle then changes the normalized state by 3.0e-7 rms (max 2.2e-6),
+  cycle balances <= 2.1e-4 (water) -> G1b criteria met at 60 cells. Product O2 4,484 ppm (4,503 before the
+  trace profiles settled: the CMS holds slightly less water at the CSS).
+- 180-cell sizing round runs_n180: iteration 2 (0.705 m) stalled 6.3 h (421 half-maps, rms ~7e-5, target
+  5e-5) in the same slow water mode. Stopped; the CSS solves in sizing and in the 2N run are now capped
+  (40 / 30 half-maps: product O2 and recovery have settled long before) and start from the converged trace
+  profiles of runs/trace60 mapped onto the target grid and CMS height (`psan2viz.trace.transfer`).
+  Continued as runs_n180a from the stalled run's checkpoint.
+- Frozen-bulk trace cycle at 180 cells: 2.2 s vs 250 s for a full cycle (sparsity 0.2 %), matching the full
+  model to rms 4.3e-7 (cycle change 7.8e-5). The final state is converged directly at 180 cells.
+- model/phase1_final.py (unattended): sized 180-cell state -> trace_css.py -> model/css/final (G1b target
+  1e-6, rtol 1e-7) -> gates_phase1.py once model/grid/2N is done -> gate3_spotcheck.py -> draft on the final
+  physics. Runs beside phase1_chain.py.

@@ -18,3 +18,4 @@ model/**/runs/
 *.out
 model/**/runs_*/
 model/sizing/*.npy
+model/phase1_final.draft_done

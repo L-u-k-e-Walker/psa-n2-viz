@@ -1,0 +1,20 @@
+{
+ "h_cms": 1.0644,
+ "h_al": 0.1313,
+ "radius": 0.05,
+ "n_cms": 180,
+ "n_al": 30,
+ "t_eq": 1.0,
+ "t_prod": 59.0,
+ "cv_feed": 0.12,
+ "cv_product": 0.06,
+ "cv_vent": 0.15,
+ "cv_purge": 0.0004449092000425925,
+ "cv_eq": 0.3185232972865081,
+ "tank_volume": 0.056346035038459766,
+ "product_mol_s": 0.020707895284500972,
+ "scheme": "upwind",
+ "rtol": 1e-06,
+ "atol_rel": 1e-09,
+ "atol_rel_trace": 1e-06
+}

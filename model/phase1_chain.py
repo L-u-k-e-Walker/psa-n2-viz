@@ -73,9 +73,10 @@ def size_running(out):
 
 
 # 180-cell sizing: rounds runs_n180, runs_n180b, ... until sized (a round already running is waited for)
-rnd, prev = 0, None
+rnd, prev, rounds = 0, None, []
+TRACE_SRC = HERE / "css" / "runs" / "trace60"  # converged trace profiles (60 cells)
 while True:
-    out = "runs_n180" + ("" if rnd == 0 else chr(ord("a") + rnd))
+    out = "runs_n180" + ("" if rnd == 0 else chr(ord("a") + rnd - 1))
     js = HERE / "sizing" / f"sizing_{out}.json"
     if not js.exists():
         if size_running(out):
@@ -86,16 +87,25 @@ while True:
             if prev is None:
                 params, warm, sl = dict(p60, n_al=30, n_cms=180), start, slope
             else:
-                h = prev["history"]
-                params = dict(prev["final"]["params"])
-                warm = HERE / "sizing" / prev_out / f"iter{prev['final']['iter']:02d}"
+                # continue from the last evaluated point with size_bed.py's update rule (secant in
+                # ln O2 over the 180-cell points with the purge on target, purge valve rescaled)
+                h = [r for rr in rounds for r in rr["history"]]
+                f = prev["final"]
+                warm = HERE / "sizing" / prev_out / f"iter{f['iter']:02d}"
+                good = [r for r in h if abs(r["purge_step_mol"] / r["purge_target_mol"] - 1) < 0.05
+                        and abs(r["params"]["h_al"] - f["params"]["h_al"]) < 1e-6]
                 sl = slope
-                if len(h) >= 2 and abs(h[-1]["params"]["h_cms"] - h[-2]["params"]["h_cms"]) > 1e-4:
-                    sl = (math.log(h[-1]["O2_ppm"]) - math.log(h[-2]["O2_ppm"])) / (h[-1]["params"]["h_cms"] - h[-2]["params"]["h_cms"])
-                # size_bed.py applies its update rule after the last iteration only when continuing, so
-                # restart from the last evaluated point with the slope measured at 180 cells
+                if len(good) >= 2 and abs(good[-1]["params"]["h_cms"] - good[-2]["params"]["h_cms"]) > 1e-4:
+                    sl = ((math.log(good[-1]["O2_ppm"]) - math.log(good[-2]["O2_ppm"]))
+                          / (good[-1]["params"]["h_cms"] - good[-2]["params"]["h_cms"]))
+                sl = min(sl, -1.0)
+                params = dict(f["params"])
+                params["cv_purge"] = params["cv_purge"] * f["purge_target_mol"] / f["purge_step_mol"]
+                hc = params["h_cms"] + (math.log(4500.0) - math.log(f["O2_ppm"])) / sl
+                params["h_cms"] = round(min(max(hc, 0.5 * params["h_cms"]), 1.6 * params["h_cms"]), 4)
             run(PY + [HERE / "sizing" / "size_bed.py", "--start", json.dumps(params), "--warm", warm, "--out", out,
-                      "--max-iter", "4", "--tol", "5e-5", "--slope", f"{min(sl, -1.0):.3f}"], HERE / "sizing")
+                      "--max-iter", "4", "--tol", "5e-5", "--max-maps", "40", "--trace-src", TRACE_SRC,
+                      "--slope", f"{min(sl, -1.0):.3f}"], HERE / "sizing")
     if not js.exists():
         log(f"sizing round {out} ended without its json")
         sys.exit(1)
@@ -103,6 +113,7 @@ while True:
     log(f"sizing round {out}: final {cur['final']['params']}, O2 {cur['final']['O2_ppm']:.0f} ppm, sized {sized(cur['final'])}")
     if sized(cur["final"]):
         break
+    rounds.append(cur)
     prev, prev_out, rnd = cur, out, rnd + 1
     if rnd > 3:
         log("180-cell sizing not converged after 4 rounds")
@@ -111,5 +122,5 @@ n180 = cur
 src180 = HERE / "sizing" / out / f"iter{n180['final']['iter']:02d}"
 log(f"180-cell sizing: {n180['final']['params']}, O2 {n180['final']['O2_ppm']:.0f} ppm, state {src180}")
 if not (HERE / "grid" / "2N" / "metrics.json").exists():
-    run(PY + [HERE / "grid" / "run_2n.py", "--src", src180, "--rtol", "1e-6", "--tol", "5e-5"], HERE / "grid")
+    run(PY + [HERE / "grid" / "run_2n.py", "--src", src180, "--rtol", "1e-6", "--tol", "5e-5", "--max-maps", "30", "--trace-src", TRACE_SRC], HERE / "grid")
 log("chain done (next: final 180-cell state with the trace solver, then the gates)")

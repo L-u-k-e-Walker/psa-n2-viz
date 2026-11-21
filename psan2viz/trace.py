@@ -132,3 +132,35 @@ def converge(plant, x0, tol=1e-6, march_tol=None, march_max=3000, full_between=3
         if checkpoint:
             checkpoint(x)
     return x, hist
+
+
+def layer_coord(plant):
+    """Cell centres as layer-relative positions: 0..1 in the alumina (z / h_al), 1..2 in the CMS."""
+    a = plant.case.case_args
+    z = plant.g.z
+    h_al, h_cms = a["h_al"], a["h_cms"]
+    return np.where(z < h_al, z / h_al, 1.0 + (z - h_al) / h_cms)
+
+
+def transfer(pl_src, x_src, pl_dst, x_dst):
+    """x_dst with its trace profiles (CO2, H2O) replaced by those of x_src, mapped layer by layer
+    (grid and CMS height may differ): gas as mole fractions times the target's total concentration,
+    loadings as they are, linear interpolation between cell centres; receiver trace fractions too.
+    A warm start only: the target is converged by full-model cycles afterwards."""
+    sp = list(pl_dst.case.species)
+    assert sp == list(pl_src.case.species)
+    tr = [sp.index("CO2"), sp.index("H2O")]
+    s1, s2 = layer_coord(pl_src), layer_coord(pl_dst)
+    x = x_dst.copy()
+    for k in (0, 1):
+        c1, q1 = pl_src.bed(x_src, k)
+        c2, q2 = pl_dst.bed(x, k)
+        C1, C2 = c1.sum(0), c2.sum(0)
+        for i in tr:
+            c2[i] = np.interp(s2, s1, c1[i] / C1) * C2
+            q2[i] = np.interp(s2, s1, q1[i])
+    t1, t2 = x_src[pl_src.s_t], x[pl_dst.s_t].copy()
+    for i in tr:
+        t2[i] = t1[i] / t1.sum() * t2.sum()
+    x[pl_dst.s_t] = t2
+    return x
