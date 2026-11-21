@@ -266,7 +266,7 @@ vectors differ in length, so the error norms pick different steps). Trace specie
 ### Sizing at 180 cells (model/sizing/runs_n180)
 - Iteration 1 (the 60-cell design, 1.064 m CMS, 13.1 cm alumina, upsampled state): product O2 1,284 ppm vs
   4,503 ppm at 60 cells (air factor 3.18, recovery 39.7 %). The 60-cell upwind grid smears the O2 front
-  (numerical Peclet 2N), so it under-predicts purity by 3.5x at this design: the reason for the finer
+  (numerical Peclet 2N), so it over-predicts product O2 by 3.5x at this design: the reason for the finer
   grid (G1e). Next: 0.705 m. The chain now runs sizing rounds (runs_n180, runs_n180a, ...) until the
   acceptance holds, restarting each round from the last point with the slope measured at 180 cells.
 - Trace march at 60 cells finished (runs/trace60, sized 60-cell design): 4 outer rounds, ~10,200 trace

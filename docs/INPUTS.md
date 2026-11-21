@@ -79,5 +79,5 @@ The full table with values and sources is generated from the final state: docs/D
 | Feed, product, vent valves | 0.12, 0.06, 0.15 mol/(s bar) | assumed | beds peak near 8 bar abs (M21d's reference pressure); blowdown in a few seconds |
 | Receiver | 6 x one bed volume | assumed | M21d's pilot: 12 L receiver for 2 L beds |
 | Delivery pressure | 6.0 barg | assumed | regulator about 1.5 bar below the inlet |
-| Grid | 30 alumina + 180 CMS cells, first-order upwind | user decision | checked against 60 + 360 (G1e); 60 cells under-predicts purity ~3.5x at the same bed |
+| Grid | 30 alumina + 180 CMS cells, first-order upwind | user decision | checked against 60 + 360 (G1e); 60 cells over-predicts product O2 ~3.5x at the same bed |
 
