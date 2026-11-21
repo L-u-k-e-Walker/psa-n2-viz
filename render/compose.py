@@ -775,8 +775,20 @@ class Composer:
         mcfg = self.cfg.get("molecules", {}).get("weights", {})
         w = [mcfg.get(sp, 1.0) for sp in SPECIES]
         pcfg = self.cfg.get("pipes", {})
-        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 16.0),
-                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05))
+        cs = self.cyc.pl.case
+        p_feed, p_vent = float(cs.p_feed), float(cs.p_vent)
+        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 11.0),
+                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05), p_ref=p_feed,
+                      density_exponent=pcfg.get("density_exponent", 1.0))
+        # line pressures (bar abs): the bed a line opens to, the feed header, the receiver, the vent
+        Pk = lambda d, k: d[f"P{k}"]  # noqa: E731
+        any_open = lambda d, v: np.asarray(d[f"open0_{v}"], bool) | np.asarray(d[f"open1_{v}"], bool)  # noqa: E731
+        feedP = lambda d: np.where(any_open(d, "feed"), p_feed, 0.5 * (d["P0"] + d["P1"]))  # equalization: between the beds  # noqa: E731
+        prodP = lambda d: np.where(any_open(d, "product"), d["p_tank"], 0.5 * (d["P0"] + d["P1"]))  # noqa: E731
+        purgeP = lambda d: np.minimum(d["P0"], d["P1"])  # the line feeds the regenerating (low) bed  # noqa: E731
+        tankP = lambda d: d["p_tank"]  # noqa: E731
+        ventP = lambda d: p_vent + 0.0 * d["P0"]  # noqa: E731
+        headP = lambda d: p_feed + 0.0 * d["P0"]  # noqa: E731
         bot = lambda fr, k: fr[f"y{k}"][:, 0]  # noqa: E731
         top = lambda fr, k: fr[f"y{k}"][:, -1]  # noqa: E731
         tank = lambda fr: fr["y_tank"]  # noqa: E731
@@ -784,39 +796,41 @@ class Composer:
         def pos(x):
             return np.maximum(x, 0.0)
 
-        net.add("exh_l", [(cx[0], vb), (xo[0], vb), (xo[0], ve), (txv, ve)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0))
-        net.add("exh_r", [(cx[1], vb), (xo[1], vb), (xo[1], ve), (txv, ve)], lambda d: -d["F1_vent"], lambda fr, F: bot(fr, 1))
-        net.add("purge_l", [(txq, pu), (xo[0], pu), (xo[0], vt), (cx[0], vt)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0)
-        net.add("purge_r", [(txq, pu), (xo[1], pu), (xo[1], vt), (cx[1], vt)], lambda d: d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("exh_l", [(cx[0], vb), (xo[0], vb), (xo[0], ve), (txv, ve)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0), pressure=ventP)
+        net.add("exh_r", [(cx[1], vb), (xo[1], vb), (xo[1], ve), (txv, ve)], lambda d: -d["F1_vent"], lambda fr, F: bot(fr, 1), pressure=ventP)
+        net.add("purge_l", [(txq, pu), (xo[0], pu), (xo[0], vt), (cx[0], vt)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0, pressure=purgeP)
+        net.add("purge_r", [(txq, pu), (xo[1], pu), (xo[1], vt), (cx[1], vt)], lambda d: d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0, pressure=purgeP)
         for k in (0, 1):
             o = 1 - k
             net.add(f"bed_bot{k}", [(cx[k], y_bots[k]), (cx[k], vb)],
                     lambda d, k=k: -(d[f"F{k}_feed"] + d[f"F{k}_vent"] + d[f"F{k}_eq_bot"]),
-                    lambda fr, F, k=k, o=o: bot(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))], bot(fr, k)))
+                    lambda fr, F, k=k, o=o: bot(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))], bot(fr, k)),
+                    pressure=lambda d, k=k: Pk(d, k))
             net.add(f"bed_top{k}", [(cx[k], y_tops[k]), (cx[k], vt)],
                     lambda d, k=k: -(d[f"F{k}_product"] + d[f"F{k}_purge"] + d[f"F{k}_eq_top"]),
                     lambda fr, F, k=k, o=o: top(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_product"]) + pos(fr[f"F{k}_purge"]), tank(fr)),
-                                                                          (pos(fr[f"F{k}_eq_top"]), top(fr, o))], top(fr, k)))
+                                                                          (pos(fr[f"F{k}_eq_top"]), top(fr, o))], top(fr, k)),
+                    pressure=lambda d, k=k: Pk(d, k))
         net.add("feed_l", [(cx[0], vb), (txf, vb)], lambda d: -(d["F0_feed"] + d["F0_eq_bot"]),
-                lambda fr, F: bot(fr, 0) if F > 0 else _mix([(pos(fr["F0_feed"]), yf), (pos(fr["F0_eq_bot"]), bot(fr, 1))], yf))
+                lambda fr, F: bot(fr, 0) if F > 0 else _mix([(pos(fr["F0_feed"]), yf), (pos(fr["F0_eq_bot"]), bot(fr, 1))], yf), pressure=feedP)
         net.add("feed_r", [(txf, vb), (cx[1], vb)], lambda d: d["F1_feed"] + d["F1_eq_bot"],
-                lambda fr, F: _mix([(pos(fr["F1_feed"]), yf), (pos(fr["F1_eq_bot"]), bot(fr, 0))], yf) if F > 0 else bot(fr, 1))
+                lambda fr, F: _mix([(pos(fr["F1_feed"]), yf), (pos(fr["F1_eq_bot"]), bot(fr, 0))], yf) if F > 0 else bot(fr, 1), pressure=feedP)
         net.add("prod_l", [(cx[0], vt), (txp, vt)], lambda d: -(d["F0_product"] + d["F0_eq_top"]),
-                lambda fr, F: top(fr, 0) if F > 0 else _mix([(pos(fr["F0_product"]), tank(fr)), (pos(fr["F0_eq_top"]), top(fr, 1))], tank(fr)))
+                lambda fr, F: top(fr, 0) if F > 0 else _mix([(pos(fr["F0_product"]), tank(fr)), (pos(fr["F0_eq_top"]), top(fr, 1))], tank(fr)), pressure=prodP)
         net.add("prod_r", [(txp, vt), (cx[1], vt)], lambda d: d["F1_product"] + d["F1_eq_top"],
-                lambda fr, F: _mix([(pos(fr["F1_product"]), tank(fr)), (pos(fr["F1_eq_top"]), top(fr, 0))], tank(fr)) if F > 0 else top(fr, 1))
+                lambda fr, F: _mix([(pos(fr["F1_product"]), tank(fr)), (pos(fr["F1_eq_top"]), top(fr, 0))], tank(fr)) if F > 0 else top(fr, 1), pressure=prodP)
         prod_mix = lambda fr, F: (_mix([(pos(-fr["F0_product"]), top(fr, 0)), (pos(-fr["F1_product"]), top(fr, 1))], tank(fr))  # noqa: E731
                                   if F > 0 else tank(fr))
-        net.add("prod_up", [(txp, vt), (txp, rl), (txq, rl)], lambda d: -(d["F0_product"] + d["F1_product"]), prod_mix, halo=True)
+        net.add("prod_up", [(txp, vt), (txp, rl), (txq, rl)], lambda d: -(d["F0_product"] + d["F1_product"]), prod_mix, halo=True, pressure=tankP)
         net.add("recv_in", [(txq, rl), (rx0, rl)], lambda d: -(d["F0_product"] + d["F1_product"]) - (d["F0_purge"] + d["F1_purge"]),
-                lambda fr, F: prod_mix(fr, 1.0) if F > 0 else tank(fr))
-        net.add("purge_down", [(txq, rl), (txq, pu)], lambda d: d["F0_purge"] + d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
-        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 70)], lambda d: d["F_product_out"], lambda fr, F: tank(fr))
-        net.add("feed_in", [(x_in, fo), (txf, fo), (txf, vb)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf, halo=True)
+                lambda fr, F: prod_mix(fr, 1.0) if F > 0 else tank(fr), pressure=tankP)
+        net.add("purge_down", [(txq, rl), (txq, pu)], lambda d: d["F0_purge"] + d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0, pressure=tankP)
+        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 70)], lambda d: d["F_product_out"], lambda fr, F: tank(fr), pressure=tankP)
+        net.add("feed_in", [(x_in, fo), (txf, fo), (txf, vb)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf, halo=True, pressure=headP)
         net.add("vent_out", [(txv, ve), (txv, vo), (sx, vo)], lambda d: -(d["F0_vent"] + d["F1_vent"]),
-                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))], bot(fr, 0)) if F > 0 else bot(fr, 0))
+                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))], bot(fr, 0)) if F > 0 else bot(fr, 0), pressure=ventP)
         for i, pts in enumerate([[(tx + 48, fo), (tx + 64, fo)], [(tx + 90, fo), (tx + 100, fo)], [(tx + 152, fo), (x_in, fo)]]):
-            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None)
+            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, gas=False)
         # straight sample taps to the outlet analyzers
         aw, ah, ag = L["analyzer_w"], L["analyzer_h"], L["analyzer_gap"]
         y_taps = [y_tops[k] - 10 for k in (0, 1)]
@@ -824,7 +838,7 @@ class Composer:
                  (cx[1] + ag, y_taps[1] - ah / 2, cx[1] + ag + aw, y_taps[1] + ah / 2)]
         for k in (0, 1):
             xe = boxes[k][2] if k == 0 else boxes[k][0]
-            net.add(f"tap{k}", [(cx[k], y_taps[k]), (xe, y_taps[k])], lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, tube_w=7.0)
+            net.add(f"tap{k}", [(cx[k], y_taps[k]), (xe, y_taps[k])], lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, tube_w=7.0, gas=False)
         net.finish()
         geo = dict(cx=cx, xo=xo, vt=vt, pu=pu, rl=rl, vb=vb, ve=ve, fo=fo, vo=vo, tx=tx, sx=sx, rcx=rcx, txf=txf, txp=txp,
                    txq=txq, receiver=(rx0, ry0, rx1, ry1), y_tops=y_tops, analyzer_boxes=boxes)

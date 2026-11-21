@@ -12,7 +12,7 @@ molecule speed and trace-species counts."""
 [layout]
 option = "F"            # A..F; F = twin towers, L-port 3-way valves, outlet analyzers (user, v08 review)
 pressure_unit = "barg"  # barg | bara
-valve_style = "ball"    # layout F: ball | butterfly | spool | piston (previews/valves2/valve_options.png); provisional until the user picks
+valve_style = "spool"   # layout F: ball | butterfly | spool | piston; spool (user, valve options review)
 
 [timing]
 # Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
@@ -59,8 +59,10 @@ speed_max = 1.5
 jitter = 0.03
 
 [pipes]
-# gas dots in the piping: v = vmax tanh(sqrt(|F| / f_ref)) px per video second (F the solver's molar flow)
+# gas dots in the piping (layout F): v = vmax tanh(sqrt((|F|/P) / (f_ref/P_feed))) px per video second, F the solver's
+# molar flow and P the line pressure (so the speed follows the actual volumetric flow)
 tube_px = 16.0
-dot_spacing_px = 16.0
+dot_spacing_px = 11.0    # at the feed pressure; the density follows the line pressure (layout F)
+density_exponent = 1.0   # dots per px ~ (P / P_feed)^exponent: 1 = molar density, as for the bed molecules
 vmax_px_s = 260.0
 f_ref_mol_s = 0.05

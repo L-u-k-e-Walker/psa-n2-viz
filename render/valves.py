@@ -185,26 +185,28 @@ class ValveArt:
         self._pivot(x, y)
 
     # ---------------------------------------------------------------- spool
+    # The housing is drawn UNDER the moving gas (z 2.8, between the tubes and the dots), so the dots are
+    # seen passing through the open side of the valve; the spool (or slide) that closes the shut branch
+    # and the outline are drawn over the gas.
+    UNDER = 2.8
+
     def _spool_3(self, x, y, common, inner, outer, open_side):
         hl, hh = 27.0, 12.5  # half length along the inner-outer axis, half height
-        horiz = inner in ("l", "r")
+        if inner not in ("l", "r"):  # not used by the layouts (alternatives are horizontal)
+            return self._ball_3(x, y, common, inner, outer, open_side)
         cvec = np.asarray(VEC[common])
-        if horiz:
-            self._flanges(x, y, hl, [inner, outer])
-            self._flanges(x, y, hh, [common])
-            self._rrect(x - hl, y - hh, 2 * hl, 2 * hh, self.light, self.dark, 2.0, rad=5.0)
-            if open_side:
-                shut = VEC[outer] if open_side == "inner" else VEC[inner]
-                sg = shut[0]
-                xa, xb = x + sg * 3.0, x + sg * (hl - 3.0)
-                self._rrect(min(xa, xb), y - hh + 3.0, abs(xb - xa), 2 * hh - 6.0, self.dark, rad=3.0, z=6.2)
-                # spool rod through the end of the body on the shut side
-                self._line([(x + sg * (hl - 3.0), y), (x + sg * (hl + 7.0), y)], self.dark, 3.0, z=6.15, cap="butt")
-            # pilot on the side away from the bed
-            pc = np.array([x, y]) - cvec * (hh + 4.5)
-            self._rrect(pc[0] - 7.0, pc[1] - 3.5, 14.0, 7.0, self.mid, self.dark, 1.2, rad=2.0, z=6.1)
-        else:  # not used by the layouts (alternatives are horizontal); fall back to a ball
-            self._ball_3(x, y, common, inner, outer, open_side)
+        self._flanges(x, y, hl, [inner, outer])
+        self._flanges(x, y, hh, [common])
+        self._rrect(x - hl, y - hh, 2 * hl, 2 * hh, self.light, rad=5.0, z=self.UNDER)
+        if open_side:
+            shut = VEC[outer] if open_side == "inner" else VEC[inner]
+            sg = shut[0]
+            xa, xb = x + sg * 4.0, x + sg * (hl - 2.5)
+            self._rrect(min(xa, xb), y - hh + 2.5, abs(xb - xa), 2 * hh - 5.0, self.dark, rad=3.0, z=6.2)
+        self._rrect(x - hl, y - hh, 2 * hl, 2 * hh, "none", self.dark, 2.0, rad=5.0, z=6.3)
+        # pilot on the side away from the bed
+        pc = np.array([x, y]) - cvec * (hh + 4.5)
+        self._rrect(pc[0] - 7.0, pc[1] - 3.5, 14.0, 7.0, self.mid, self.dark, 1.2, rad=2.0, z=6.1)
 
     def _spool_2(self, x, y, open_, u):
         p = _perp(u)
@@ -216,11 +218,12 @@ class ValveArt:
         self._flanges(x, y, half_t, [u, -u])
         a = side / np.linalg.norm(side)
         corners = [c - a * hw - u * half_t, c + a * (hw + ch) - u * half_t, c + a * (hw + ch) + u * half_t, c - a * hw + u * half_t]
-        self._poly(corners, self.light, self.dark, 2.0)
+        self._poly(corners, self.light, z=self.UNDER)
         sc = c + a * (hw + ch * 0.5 + 1.0) if open_ else c
         sh = hw - 0.5
         blk = [sc - a * sh - u * (half_t - 3), sc + a * sh - u * (half_t - 3), sc + a * sh + u * (half_t - 3), sc - a * sh + u * (half_t - 3)]
         self._poly(blk, self.dark, z=6.2)
+        self._poly(corners, "none", self.dark, 2.0, z=6.3)
         rod0 = sc + a * sh
         self._line([rod0, c + a * (hw + ch + 6.0)], self.dark, 2.6, z=6.15, cap="butt")
 
@@ -232,9 +235,10 @@ class ValveArt:
         hw, half_t = self.hb + 2.5, 8.0
         self._flanges(x, y, half_t, [u, -u])
         corners = [c - a * hw - u * half_t, c + a * (hw + 12) - u * half_t, c + a * (hw + 12) + u * half_t, c - a * hw + u * half_t]
-        self._poly(corners, self.light, self.dark, 1.8)
+        self._poly(corners, self.light, z=self.UNDER)
         tip = c - a * (self.hb * 0.25)
         self._poly([tip, c + a * hw - u * 4.0, c + a * hw + u * 4.0], self.dark, z=6.2)  # tapered needle into the bore
+        self._poly(corners, "none", self.dark, 1.8, z=6.3)
         self._line([c + a * hw, c + a * (hw + 18)], self.dark, 2.4)
         self._circle(*(c + a * (hw + 21)), 3.6, self.T["bg"], self.dark, 1.6, z=6.4)
 
