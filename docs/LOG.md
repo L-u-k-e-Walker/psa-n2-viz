@@ -288,3 +288,12 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   G1d PASS (2.2e-6), G1f PASS (O2 4,484 ppm, air factor 3.18, CMS water 0.65 % of feed equilibrium,
   interface y_H2O 0.87 % of feed, product CO2 0.017 ppm, receiver >= 7.48 bar vs 7.01 delivery), G1e n/a.
   The pipeline is ready for the 180-cell state.
+- Round runs_n180a, iteration 1 (0.705 m, from the stalled run's checkpoint, trace profiles from trace60):
+  O2 13,177 ppm, air factor 2.74, recovery 45.7 %, but purge 0.171 vs target 0.117 mol (+46 %): the purge
+  valve update kept the purge per step while the target shrank with the bed. CMS water 0.4 %. Iteration 2
+  went back to 1.013 m with the 60-cell default slope (round a could not see round 0's point). Stopped.
+- Sizing update rule moved to model/sizing/sizing_rule.py, shared by size_bed.py and the chain: purge valve
+  rescaled by target/purge x V_new/V_old (the purge per step follows the valve and pressures, the target
+  the packed volume); secant over all points of the grid (`--prior` passes earlier rounds), stepping from
+  the purge-on-target point nearest the target. 180-cell slope from rounds 0 and a: -6.47 /m (60 cells:
+  -3.49; sharper fronts). Round runs_n180b: 0.8705 m, cv_purge 3.73e-4.

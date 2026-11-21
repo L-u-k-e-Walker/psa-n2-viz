@@ -1,0 +1,53 @@
+{
+ "target_O2_ppm": 4500.0,
+ "history": [
+  {
+   "iter": 1,
+   "O2_ppm": 13177.49423,
+   "air_factor": 2.73587,
+   "recovery_N2": 0.45686,
+   "purge_step_mol": 0.17133,
+   "purge_target_mol": 0.11718,
+   "h2o_front_zL": 0.15182,
+   "alumina_top_zL": 0.15706,
+   "h2o_cms_max_rel": 0.00423,
+   "h2o_interface_y_rel": 0.00463,
+   "css_iterations": 6,
+   "css_change_rms": 3e-05,
+   "wall_s": 2254.13606,
+   "p_tank_min": null,
+   "params": {
+    "h_cms": 0.7047,
+    "h_al": 0.1313,
+    "cv_purge": 0.0004553880793026462,
+    "n_al": 30,
+    "n_cms": 180
+   },
+   "note": "round a stopped at iteration 2 (1.013 m from the 60-cell slope); continued as runs_n180b with the 180-cell secant"
+  }
+ ],
+ "final": {
+  "iter": 1,
+  "O2_ppm": 13177.49423,
+  "air_factor": 2.73587,
+  "recovery_N2": 0.45686,
+  "purge_step_mol": 0.17133,
+  "purge_target_mol": 0.11718,
+  "h2o_front_zL": 0.15182,
+  "alumina_top_zL": 0.15706,
+  "h2o_cms_max_rel": 0.00423,
+  "h2o_interface_y_rel": 0.00463,
+  "css_iterations": 6,
+  "css_change_rms": 3e-05,
+  "wall_s": 2254.13606,
+  "p_tank_min": null,
+  "params": {
+   "h_cms": 0.7047,
+   "h_al": 0.1313,
+   "cv_purge": 0.0004553880793026462,
+   "n_al": 30,
+   "n_cms": 180
+  },
+  "note": "round a stopped at iteration 2 (1.013 m from the 60-cell slope); continued as runs_n180b with the 180-cell secant"
+ }
+}

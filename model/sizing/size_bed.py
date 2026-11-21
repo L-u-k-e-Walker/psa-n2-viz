@@ -22,15 +22,14 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path[:0] = [str(ROOT), str(HERE)]
 from psan2viz import css  # noqa: E402
 from psan2viz.analysis import Cycle  # noqa: E402
 from psan2viz.cases import n2_generator_case  # noqa: E402
 from psan2viz.plant import Plant  # noqa: E402
 from psan2viz.trace import transfer  # noqa: E402
 
-O2_TARGET = 4500.0  # ppm
-O2_TOL = 0.03
+from sizing_rule import O2_TARGET, next_params, sized  # noqa: E402
 PURGE_X = 0.40  # bed volumes (normal conditions) per purge step, M21d
 N_NORMAL = 101325.0 / (8.314462618 * 273.15)  # mol/m^3 at 0 degC, 1 atm
 SOLVER = dict(rtol=1e-6, atol_rel=1e-9, atol_rel_trace=1e-6)
@@ -45,6 +44,7 @@ ap.add_argument("--cos-min", type=float, default=0.9, help="alignment needed for
 ap.add_argument("--m-max", type=float, default=10.0, help="largest Aitken jump (cycles)")
 ap.add_argument("--slope", type=float, default=-6.0, help="first guess of d ln(O2) / d h_cms (1/m)")
 ap.add_argument("--out", default="runs", help="subfolder for the iteration states")
+ap.add_argument("--prior", nargs="*", default=[], help="earlier sizing_*.json of the same grid: their points\n                join the secant (sizing_rule.next_params)")
 ap.add_argument("--max-maps", type=int, default=3000,
                 help="cap on half-cycle maps per CSS solve: below ~1e-4 only the slow trace mode is left and the\n                product O2 is settled (the 180-cell iteration 2 spent 6 h in that mode at the 5e-5 target)")
 ap.add_argument("--trace-src", default=None,
@@ -65,6 +65,7 @@ if a.warm:
     w = Path(a.warm)
     x0 = np.load(w) if w.suffix == ".npy" else np.load(w / "css_state.npz")["x_start"]
 history = []
+prior = [r for f in a.prior for r in json.loads(Path(f).read_text())["history"]]
 (HERE / a.out).mkdir(parents=True, exist_ok=True)
 trace_src = css.load(Path(a.trace_src))[1:] if a.trace_src else None
 for it in range(1, a.max_iter + 1):
@@ -98,29 +99,11 @@ for it in range(1, a.max_iter + 1):
     history.append(rec)
     css.save(dict(case=case, x=x, hist=hist, metrics=met), HERE / a.out / f"iter{it:02d}")
     log("  -> " + json.dumps({k: (round(v, 5) if isinstance(v, float) else v) for k, v in rec.items() if k != "params"}))
-    ok_o2 = abs(met["product_O2_ppm"] / O2_TARGET - 1) < O2_TOL
-    ok_purge = abs(purge_step / purge_target - 1) < 0.03
-    ok_h2o = q_cms < 0.05 and wf["interface_y_rel"] < 0.05  # the alumina captures >= 95 % of the water
-    if ok_o2 and ok_purge and ok_h2o:
+    if sized(rec):
         log("  sized.")
         break
-    # updates
-    params["cv_purge"] = params["cv_purge"] * purge_target / purge_step
-    if not ok_h2o:
-        params["h_al"] = round(params["h_al"] * 1.3, 4)
-    # secant in ln O2 vs h_cms, only between points with the purge on target (within 5 %) and the
-    # same alumina layer: a purge or alumina change moves O2 too and would corrupt the slope
-    # (the first 60-cell run, runs_n60b, overshot to 0.75 m that way)
-    good = [h for h in history if abs(h["purge_step_mol"] / h["purge_target_mol"] - 1) < 0.05
-            and abs(h["params"]["h_al"] - params["h_al"]) < 1e-6]
-    pts = [(h["params"]["h_cms"], math.log(h["O2_ppm"])) for h in good]
-    if len(pts) >= 2 and abs(pts[-1][0] - pts[-2][0]) > 1e-4:
-        slope = (pts[-1][1] - pts[-2][1]) / (pts[-1][0] - pts[-2][0])
-    else:
-        slope = a.slope  # 1/m, first guess (ln O2 per metre of CMS)
-    slope = min(slope, -1.0)
-    dh = (math.log(O2_TARGET) - math.log(met["product_O2_ppm"])) / slope
-    params["h_cms"] = round(float(np.clip(params["h_cms"] + dh, 0.5 * params["h_cms"], 1.6 * params["h_cms"])), 4)
+    params, slope = next_params(prior + history, a.slope)  # update rule: sizing_rule.py
+    log(f"    next: secant slope {slope:.3f} /m")
     x0 = x
 (HERE / f"sizing_{a.out}.json").write_text(json.dumps(dict(target_O2_ppm=O2_TARGET, history=history, final=history[-1]),
                                                        indent=1))
