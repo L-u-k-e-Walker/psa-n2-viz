@@ -21,6 +21,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 PY = [sys.executable, "-I"]
 LOG = HERE / "phase1_final.log"
+sys.path.insert(0, str(HERE / "sizing"))
+from sizing_rule import sized  # noqa: E402
 
 
 def log(msg):
@@ -38,11 +40,6 @@ def run(cmd, cwd, check=True):
     if check and r.returncode != 0:
         sys.exit(r.returncode)
     return r.returncode
-
-
-def sized(rec):
-    return (abs(rec["O2_ppm"] / 4500.0 - 1) < 0.03 and abs(rec["purge_step_mol"] / rec["purge_target_mol"] - 1) < 0.03
-            and rec["h2o_cms_max_rel"] < 0.05 and rec["h2o_interface_y_rel"] < 0.05)
 
 
 def find_sized():
