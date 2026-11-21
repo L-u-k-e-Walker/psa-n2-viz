@@ -107,7 +107,8 @@ def n2_generator_case(h_cms=0.60, h_al=0.06, radius=0.05, n_cms=60, n_al=10, t_e
         "p_deliver": "assumed: regulator outlet 6.0 barg (about 1.5 bar below the inlet, typical of small generators)",
         "bed radius": "assumed: 100 mm ID columns, typical of small CMS generators",
         "h_cms": "sized (model/sizing) so that product O2 meets 0.5 % at 30 SLPM",
-        "h_al": "sized (model/sizing) so that the H2O front stays inside the layer",
+        "h_al": "sized (model/sizing) so that the alumina captures >= 95 % of the water (CMS water < 5 % of its feed "
+                "equilibrium, interface y_H2O < 5 % of the feed during production)",
         "CMS layer": "M21d Tab. 3.1-1: bulk density 711 kg/m^3, total voidage 0.543",
         "alumina layer": "assumed: F-200-like beads, inter-particle void 0.40, pellet porosity 0.55, pellet density 1250 kg/m^3",
         "cycle": "M21d Tab. 4.3-2: half-cycle 60 s = 1 s equalization (top/top + bottom/bottom) + 59 s production / "
