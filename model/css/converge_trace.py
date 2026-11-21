@@ -32,6 +32,11 @@ ap.add_argument("--relax", type=int, default=6)
 ap.add_argument("--cos-min", type=float, default=0.995)
 ap.add_argument("--max-step", type=float, default=0.05)
 ap.add_argument("--max-cycles", type=int, default=2000)
+ap.add_argument("--method", default="mode", choices=["mode", "tracenk"],
+                help="mode: single-mode jumps (near the CSS); tracenk: Newton-Krylov on the trace subspace (far)")
+ap.add_argument("--newton-max", type=int, default=8)
+ap.add_argument("--krylov", type=int, default=50)
+ap.add_argument("--eta", type=float, default=0.1)
 a = ap.parse_args()
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
@@ -55,10 +60,19 @@ assert x0.size == pl.size, (x0.size, pl.size)
 log(f"src {a.src}; case {json.dumps({k: v for k, v in args.items() if k != 'solver_params'})}")
 log(f"tol {a.tol}, relax {a.relax}, cos_min {a.cos_min}, max_step {a.max_step}")
 t0 = time.time()
-x, hist = pl.run_to_css_mode(x0, tol=a.tol, relax=a.relax, cos_min=a.cos_min, max_step=a.max_step,
-                             max_cycles=a.max_cycles, checkpoint=lambda xc: np.save(out / "checkpoint.npy", xc),
-                             progress=lambda h: log(f"  {h['kind']:5s} {h['iter']:3d}  rms {h['rms']:.3e}  max {h['max']:.3e}  "
-                                                    f"cycles {h['cycles']:4d}  {h['wall_s']:.0f}s  {h.get('note', '')}"))
+ck = lambda xc: np.save(out / "checkpoint.npy", xc)  # noqa: E731
+if a.method == "mode":
+    x, hist = pl.run_to_css_mode(x0, tol=a.tol, relax=a.relax, cos_min=a.cos_min, max_step=a.max_step,
+                                 max_cycles=a.max_cycles, checkpoint=ck,
+                                 progress=lambda h: log(f"  {h['kind']:5s} {h['iter']:3d}  rms {h['rms']:.3e}  max {h['max']:.3e}  "
+                                                        f"cycles {h['cycles']:4d}  {h['wall_s']:.0f}s  {h.get('note', '')}"))
+else:
+    x, hist = pl.run_to_css_trace_nk(x0, tol=a.tol, newton_max=a.newton_max, krylov=a.krylov, eta=a.eta,
+                                     checkpoint=ck,
+                                     progress=lambda h: log(f"  {h['kind']:6s} {h['iter']:3d}  rms {h['rms']:.3e}  trace {h['rms_trace']:.3e}  "
+                                                            f"maps {h['maps']:4d}  {h['wall_s']:.0f}s  {h.get('note', '')}"))
+    for h in hist:
+        h.setdefault("max", h["rms_trace"])
 t_css = time.time() - t0
 x_end, recs = pl.run_cycle(x)
 rms, mx = pl.norm_change(x_end, x)

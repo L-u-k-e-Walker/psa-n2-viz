@@ -239,3 +239,26 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   jump 251 cycles (series 2,181, capped) -> residual 1.43e-5 -> 1.25e-5 as predicted (0.9995^251 = 0.88);
   steps right after a jump see the excited fast modes (lam > 1 or cos < 0.995) and skip. Working, but the cap
   (0.05) limits it to ~250 cycles per jump.
+- Follow-up: with a larger cap (0.2, runs/mode60s) and over more steps (runs/mode60) the decay factors settled
+  at 0.9991-1.0003, i.e. a near-constant drift, not a geometric approach; the residual stuck at 1.0e-5.
+  The cycle water balance shows why: the vent removes 4.8 % more water than the feed brings (-3.5e-4
+  mol/cycle; G1b's 0.5 % balance limit fails too). The alumina is loaded through its whole depth
+  (3.9 -> 1.2 mol/kg over 13 cm) and is drying out: the CSS holds substantially less water, an O(1) change
+  in the normalized water loadings, ~1e4 cycles away at this rate. Linear jumps can't cover it, and
+  projective (forward) steps of hundreds of cycles are unstable for the intermediate modes (decay 0.9-0.97).
+- Plan (grid sequencing): converge the trace profiles fully at 60 cells (cheap cycles, ~10 s) with
+  Newton-Krylov on the trace subspace (`run_to_css_trace_nk`, Krylov 50, inexact eta 0.1, rtol 1e-7;
+  runs/nk60), then carry them into the 180-cell sized state, where the correction is small and the
+  single-mode jumps apply.
+- Trace NK at 60 cells (runs/nk60) failed: GMRES did not converge in 100 iterations and the line search
+  rejected even lambda = 0.1 in both Newton steps (the finite-difference Jacobian through the adaptive
+  integrator and the clipping is too noisy). Stopped.
+- Frozen-bulk trace march (`psan2viz/trace.py`): the CO2/H2O subsystem integrated with the bulk taken
+  from one recorded full cycle of the complete model (its dense output), using the plant's own RHS (all
+  valve/boundary couplings unchanged), BDF with a numerically detected sparsity pattern (entries < 1e-4
+  of the row maximum dropped: the weak coupling through the velocity field). Check at 60 cells: from the
+  same start, one frozen-bulk cycle reproduces the full model's trace end state to rms 2.7e-7 (the
+  cycle's own change is 2.6e-5, so 1 %), the same for pattern thresholds 1e-6..1e-2; 1.06 s per cycle vs
+  15 s for a full cycle (2,550 RHS calls at 0.19 ms). `trace.converge` alternates 3 full-model cycles
+  (bulk follows the trace state) with marches; convergence is judged only on full-model cycles.
+  Driver model/css/trace_css.py; running at 60 cells (runs/trace60).
