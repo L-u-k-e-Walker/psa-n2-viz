@@ -1,0 +1,326 @@
+{
+ "T_K": 293.15,
+ "species": [
+  "N2",
+  "O2",
+  "Ar",
+  "CO2",
+  "H2O"
+ ],
+ "cms_isotherm": {
+  "O2": {
+   "qs": [
+    0.017287520889328056,
+    2.5395474171971246
+   ],
+   "b": [
+    17.841177465380635,
+    0.1614597071636035
+   ],
+   "fit_max_rel_err_vs_sips": 0.04386845897160811,
+   "fit_rms_rel_err": 0.017884985348968475,
+   "source": "dual-site Langmuir fit to the Sips isotherm of M21d Tab. 3.3-1 at 293.15 K, 0.005-10 bar (a single site misses the Sips curve by up to 20 % at 6-10 bar)"
+  },
+  "N2": {
+   "qs": [
+    0.0266039098305613,
+    1.9362631094011988
+   ],
+   "b": [
+    21.644458486717706,
+    0.23510576855264292
+   ],
+   "fit_max_rel_err_vs_sips": 0.05954819616437293,
+   "fit_rms_rel_err": 0.02421920652091208,
+   "source": "dual-site Langmuir fit to the Sips isotherm of M21d Tab. 3.3-1 at 293.15 K, 0.005-10 bar (a single site misses the Sips curve by up to 20 % at 6-10 bar)"
+  },
+  "check_vs_isodb": {
+   "N2": {
+    "doi": "10.1002/cite.201300063",
+    "T": 293,
+    "max_rel_dev_fit_vs_data": 0.04312255683685923
+   },
+   "O2": {
+    "doi": "10.1002/cite.201300063",
+    "T": 298,
+    "max_rel_dev_fit_vs_data": 0.052860307463200175
+   }
+  },
+  "Ar": {
+   "qs": [
+    0.017287520889328056,
+    2.5395474171971246
+   ],
+   "b": [
+    17.841177465380635,
+    0.1614597071636035
+   ],
+   "source": "assumed equal to O2 (no ambient-T Ar data on CMS reachable)"
+  },
+  "CO2": {
+   "qs": 3.7004410904830842,
+   "b": 1.5699930690889876,
+   "fit_max_rel_err": 0.3457712252007385,
+   "fit_rms_rel_err": 0.08467483397743022,
+   "doi": "10.1007/s10450-016-9821-x",
+   "p_range_bar": [
+    0.049,
+    20.0
+   ],
+   "source": "Langmuir fit to ISODB CT-350 293 K (Isotherm20 p >= 0.04 bar, Isotherm41 p >= 0.2 bar; the scattered low-pressure points look unequilibrated)",
+   "extrapolated_below_bar": 0.049
+  },
+  "H2O": {
+   "qs": 7.1,
+   "b": 18.58581218704199,
+   "doi": "10.1021/la061140a",
+   "rh_max": 0.2147301766105459,
+   "max_rel_err": 0.09786404299269316,
+   "source": "Henry slope of ISODB la061140a Isotherm1 (CMS, 293 K) at RH <= 0.22, capacity 7.1 mmol/g (its highest loading); the pore-filling rise above RH ~0.3 is not represented"
+  }
+ },
+ "alumina_isotherm": {
+  "H2O": {
+   "qs": [
+    3.2476207224601032,
+    499.9999717532285
+   ],
+   "b_rh": [
+    99.99999999999999,
+    0.022404841509702962
+   ],
+   "b": [
+    4274.9388136680445,
+    0.9577932658391015
+   ],
+   "fit_max_rel_err": 0.059976437376617765,
+   "rh_points": [
+    0.0429,
+    0.1255,
+    0.2271,
+    0.3624,
+    0.4978
+   ],
+   "doi": "10.1021/la901107s",
+   "T_data": 303,
+   "source": "dual-site Langmuir in RH fitted to ISODB la901107s Isotherm4 (F-200, 303 K) at RH <= 0.5; moved to 293.15 K assuming loading depends on RH only (b = b_RH / p_sat(293.15 K)); strong-site b_RH capped at 100 (not constrained by the data, which start at RH 0.043)",
+   "b_rh_cap": 100.0
+  },
+  "CO2": {
+   "qs": [
+    0.4426696756787957,
+    1.8441389587818888
+   ],
+   "b": [
+    40.13851413637538,
+    0.5407090394841804
+   ],
+   "heats_kJ_mol": [
+    39.50980491398994,
+    27.03501292267694
+   ],
+   "fit_max_rel_err": 0.015261112446287244,
+   "doi": "10.1007/s10450-017-9907-0",
+   "extrapolated_below_bar": 0.0369,
+   "source": "dual-site Langmuir with per-site heats fitted jointly to 273 and 303 K (ISODB 10.1007/s10450-017-9907-0), evaluated at 293.15 K; feed CO2 (3.6 mbar) is below the measured range"
+  },
+  "N2": {
+   "qs": 1.9329135231477834,
+   "b": 0.2018655118627772,
+   "b_313": 0.13663530305038085,
+   "fit_max_rel_err": 0.020155942165097415,
+   "doi": "10.1007/s10934-011-9494-5",
+   "source": "Langmuir fit to ISODB 10.1007/s10934-011-9494-5 (alumina, 313 K); b moved to 293.15 K with an assumed 15 kJ/mol heat of adsorption"
+  },
+  "O2": {
+   "qs": 1.9329135231477834,
+   "b": 0.2018655118627772,
+   "source": "assumed equal to N2"
+  },
+  "Ar": {
+   "qs": 1.9329135231477834,
+   "b": 0.2018655118627772,
+   "source": "assumed equal to N2"
+  }
+ },
+ "cms_kinetics": {
+  "model": "LDF with Darken factor 1/(1-theta_total)",
+  "k0_per_s": {
+   "O2": 1.5149718949686524,
+   "N2": 0.0032936364963114476,
+   "Ar": 0.0032936364963114476
+  },
+  "k_qdf_293K_zero_loading_per_s": {
+   "O2": 0.9011838401187556,
+   "N2": 0.004007205852667657
+  },
+  "swing_test": {
+   "P_high_bar": 8.0,
+   "P_low_bar": 1.0,
+   "half_s": 59.0,
+   "y_air": {
+    "O2": 0.2095,
+    "N2": 0.7905
+   }
+  },
+  "swing_amplitude_mol_kg": {
+   "qdf": [
+    0.17891847415285578,
+    0.12873761116879268
+   ],
+   "ldf_fit": [
+    0.1789184717108349,
+    0.12609020847767205
+   ]
+  },
+  "swing_traj_max_rel_err": 0.5749412364754186,
+  "k0_CO2": 0.01,
+  "k0_H2O": 0.01,
+  "source": "k0 fitted so that the LDF+Darken pellet follows Marcinek's QDF+Darken+Arrhenius model (M21d Tab. 3.5-1) through a square-wave air swing; Ar = N2 (assumed: Ar/N2 rate ratios on CMS in the literature lie on both sides of 1); CO2 and H2O 0.01 /s (assumed: slow micropore uptake, minutes; neither reaches the product)"
+ },
+ "alumina_kinetics": {
+  "k_per_s": {
+   "N2": 0.25275537980894963,
+   "O2": 0.14473793189583203,
+   "Ar": 0.09910827756860345,
+   "CO2": 0.0022507437407183898,
+   "H2O": 6.57117075934077e-05
+  },
+  "chord_slope_m3_kg": {
+   "N2": 0.0040611566943333285,
+   "O2": 0.006993125847195526,
+   "Ar": 0.009360156099363252,
+   "CO2": 0.40298075061557376,
+   "H2O": 21.451700903268396
+  },
+  "bead": {
+   "radius": 0.0012,
+   "porosity": 0.55,
+   "density": 1250.0,
+   "pore_d": 5.7e-09,
+   "tortuosity": 3.0
+  },
+  "P_mid_bar": 4.5,
+  "source": "Glueckauf LDF from macropore diffusion (Bosanquet of Knudsen and molecular), chord from a clean bead to the feed partial pressure; bead data assumed (F-200-like)"
+ },
+ "solver_params": {
+  "order": [
+   "N2",
+   "O2",
+   "Ar",
+   "CO2",
+   "H2O"
+  ],
+  "sites": "site 0 = strong site; single-site species placed as noted",
+  "cms": {
+   "qs": [
+    [
+     0.0266039098305613,
+     1.9362631094011988
+    ],
+    [
+     0.017287520889328056,
+     2.5395474171971246
+    ],
+    [
+     0.017287520889328056,
+     2.5395474171971246
+    ],
+    [
+     0.0,
+     3.7004410904830842
+    ],
+    [
+     0.0,
+     7.1
+    ]
+   ],
+   "b": [
+    [
+     21.644458486717706,
+     0.23510576855264292
+    ],
+    [
+     17.841177465380635,
+     0.1614597071636035
+    ],
+    [
+     17.841177465380635,
+     0.1614597071636035
+    ],
+    [
+     0.0,
+     1.5699930690889876
+    ],
+    [
+     0.0,
+     18.58581218704199
+    ]
+   ],
+   "k0": [
+    0.0032936364963114476,
+    1.5149718949686524,
+    0.0032936364963114476,
+    0.01,
+    0.01
+   ],
+   "darken": true,
+   "single_site_placement": "CO2, H2O on site 1 (the main site; site 0 is a tiny strong site of N2/O2/Ar whose large b would crowd them out)"
+  },
+  "alumina": {
+   "qs": [
+    [
+     0.0,
+     1.9329135231477834
+    ],
+    [
+     0.0,
+     1.9329135231477834
+    ],
+    [
+     0.0,
+     1.9329135231477834
+    ],
+    [
+     0.4426696756787957,
+     1.8441389587818888
+    ],
+    [
+     3.2476207224601032,
+     499.9999717532285
+    ]
+   ],
+   "b": [
+    [
+     0.0,
+     0.2018655118627772
+    ],
+    [
+     0.0,
+     0.2018655118627772
+    ],
+    [
+     0.0,
+     0.2018655118627772
+    ],
+    [
+     40.13851413637538,
+     0.5407090394841804
+    ],
+    [
+     4274.9388136680445,
+     0.9577932658391015
+    ]
+   ],
+   "k0": [
+    0.25275537980894963,
+    0.14473793189583203,
+    0.09910827756860345,
+    0.0022507437407183898,
+    6.57117075934077e-05
+   ],
+   "darken": false,
+   "single_site_placement": "N2, O2, Ar on site 1 (not displaced by water's strong site); CO2 and H2O dual-site"
+  }
+ }
+}

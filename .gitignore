@@ -13,3 +13,6 @@ previews/**
 !previews/*/
 !previews/*/contact_*.png
 !previews/*/config_*.toml
+# intermediate CSS / sizing runs (final states are committed from model/css/final and model/grid/2N)
+model/**/runs/
+*.out
