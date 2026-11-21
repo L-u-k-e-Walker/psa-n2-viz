@@ -90,10 +90,11 @@ class GasDots:
         self.match(tgt)
 
 
-def molecule_history(frames, pack, eps_cells, weights, n_ref, key_extra="", cache_dir=HERE / "cache", log=print):
+def molecule_history(frames, pack, eps_cells, weights, n_ref, key_extra="", cache_dir=HERE / "cache", log=print, motion=None):
     """Positions/species of the molecules of both beds at every frame of the 30 fps timeline (cached)."""
     nf = len(frames["t_video"])
-    key = hashlib.sha256((json.dumps([list(map(float, weights)), n_ref]) + key_extra).encode()).hexdigest()[:12]
+    motion = motion or {}
+    key = hashlib.sha256((json.dumps([list(map(float, weights)), n_ref, sorted(motion.items())]) + key_extra).encode()).hexdigest()[:12]
     path = Path(cache_dir) / f"molecules_{key}.npz"
     if path.exists():
         return dict(np.load(path))
@@ -109,7 +110,7 @@ def molecule_history(frames, pack, eps_cells, weights, n_ref, key_extra="", cach
             i = f % nf
             dt = frames["t_video"][1] - frames["t_video"][0]
             tgt = dots.targets(frames[f"C{k}"][i], frames[f"y{k}"][i], z_cells, C_ref)
-            dots.advance(frames[f"u{k}"][i], eps_cells, z_faces, z_cells, tgt, dt)
+            dots.advance(frames[f"u{k}"][i], eps_cells, z_faces, z_cells, tgt, dt, **motion)
             if f >= nf:
                 pos.append(dots.pos.astype(np.float32))
                 sp.append(dots.sp.astype(np.int8))

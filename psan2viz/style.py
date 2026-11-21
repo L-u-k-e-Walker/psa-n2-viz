@@ -27,13 +27,13 @@ THEMES = {
     "white": dict(
         bg="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781", grid="#e1e0d9", axis="#c3c2b7",
         bare="#d8d4cb", metal="#9a9890", glass="#b9c6d2", highlight="#f0efec",
-        bare_alumina="#eeebe4",
+        bare_alumina="#eeebe4", tube_edge="#a9a79f", tube_fill="#ecebe6", tube_shine="#ffffff",
         N2="#1baf7a", O2="#eb6834", Ar="#006644", H2O="#2a78d6", CO2="#0b0b0b",
     ),
     "dark": dict(
         bg="#1a1a19", ink="#f0efec", ink2="#c3c2b7", muted="#898781", grid="#2c2c2a", axis="#383835",
         bare="#4a4945", metal="#6d6b66", glass="#5d6b78", highlight="#2c2c2a",
-        bare_alumina="#6b6964",
+        bare_alumina="#6b6964", tube_edge="#5a5853", tube_fill="#262624", tube_shine="#77756f",
         N2="#199e70", O2="#d95926", Ar="#6adeac", H2O="#3987e5", CO2="#f0efec",
     ),
 }

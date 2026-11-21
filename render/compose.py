@@ -21,6 +21,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Polygon, Rectang
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from pipes import PipeNet, _mix  # noqa: E402
 from psan2viz.style import SPECIES, SPECIES_ROLE, SPECIES_TEX, THEMES, apply_ramp, loading_ramp, mpl_rc  # noqa: E402
 
 W, H = 1920, 1080
@@ -40,13 +41,14 @@ LAYOUTS = {
         readouts=(1330, 770), footnote=(36, 1070)),
     "B": dict(  # beds close together with one shared profile block between them, dashboard on the right
         name="beds with shared profiles", eq_x=620, title=(36, 24), legend=(1330, 866),
-        beds=[(185, 330, 305, 815), (900, 330, 1020, 815)], prof="shared", label_side=["left", "right"],
-        eq_bot_drop=64,  # bottom equalization pipe below the profile x-axis labels
+        beds=[(185, 360, 305, 760), (900, 360, 1020, 760)], prof="shared", label_side=["left", "right"],
+        prof_boxes=[(380, 360, 600, 760), (640, 360, 860, 760)],
+        eq_bot_drop=72,  # bottom equalization pipe below the profile x-axis labels
+        bot_split=44, top_split=44, purge_gap=26,
         train="compact",
-        prof_boxes=[(380, 330, 600, 815), (640, 330, 860, 815)],
-        feed_y=965, vent_y=1008, top_y=272, prod_y=212, train_x=20, receiver=(1170, 150, 1230, 290), out="down",
+        feed_y=975, vent_y=1020, top_y=300, prod_y=150, train_x=20, receiver=(1170, 104, 1230, 244), out="down",
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
-        readouts=(1330, 696), footnote=(36, 1070)),
+        readouts=(1330, 696), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -211,7 +213,7 @@ class Composer:
             self.text(fig, xl, y1 - 0.55 * (y1 - y0), "CMS", size=10, ha=ha, va="center", color=T["muted"])
 
     # -------------------------------------------------------------------- P&ID
-    def _valve(self, ax, x, y, open_, vertical=True, size=11, needle=False):
+    def _valve(self, ax, x, y, open_, vertical=True, size=13, needle=False):
         T = self.T
         s = size
         if vertical:
@@ -237,18 +239,17 @@ class Composer:
                                      mutation_scale=1, lw=w * self.s, color=color, alpha=0.35 + 0.65 * min(1, 4 * a),
                                      zorder=8, shrinkA=0, shrinkB=0))
 
-    def _pid(self, fig, fr):
-        T, L = self.T, self.L
-        ax = fig.add_axes([0, 0, 1, 1], zorder=0)
-        ax.set_xlim(0, W)
-        ax.set_ylim(H, 0)
-        ax.set_axis_off()
-        pipe = dict(color=T["axis"] if self.theme == "dark" else T["muted"], lw=2.2 * self.s, solid_capstyle="butt", zorder=2)
-        thin = dict(pipe, lw=1.3 * self.s)
+    def _net(self):
+        """The pipe network for the current nozzle geometry (built once per geometry)."""
+        key = None if self.nozzles is None else tuple(map(tuple, self.nozzles))
+        if getattr(self, "_net_key", "unset") == key:
+            return self._net_obj, self._geo
+        L, T = self.L, self.T
         beds = [self.bed_geometry(k) for k in (0, 1)]
         cx = [0.5 * (b[0] + b[2]) for b in beds]
         dx = 26
         fy, vy, ty, py = L["feed_y"], L["vent_y"], L["top_y"], L["prod_y"]
+        pq = py + L.get("purge_gap", 24)
         if self.nozzles is not None:
             y_tops = [nz[0] for nz in self.nozzles]
             y_bot = max(nz[1] for nz in self.nozzles)
@@ -256,98 +257,127 @@ class Composer:
             y_tops = [b[1] - 14 for b in beds]
             y_bot = beds[0][3] + 14
         node_b = y_bot + L.get("eq_bot_drop", 30)
-        split_b = node_b + 26
+        split_b = node_b + L.get("bot_split", 26)
         node_t = ty
-        split_t = node_t - 20
-        # bottom: nozzles, bottom equalization, feed (left) and vent (right) drops
-        for k in (0, 1):
-            ax.plot([cx[k], cx[k]], [y_bot, split_b], **pipe)
-            ax.plot([cx[k] - dx, cx[k] + dx], [split_b, split_b], **pipe)
-            ax.plot([cx[k] - dx, cx[k] - dx], [split_b, fy], **pipe)
-            ax.plot([cx[k] + dx, cx[k] + dx], [split_b, vy], **pipe)
-        ax.plot([cx[0], cx[1]], [node_b, node_b], **pipe)
+        split_t = node_t - L.get("top_split", 20)
         mid = L.get("eq_x", 0.5 * (cx[0] + cx[1]))
-        self._valve(ax, mid, node_b, fr["open0_eq_bot"], vertical=False)
-        # feed header (gaps where the vent drops cross it)
         tx = L["train_x"]
-        compact = L.get("train") == "compact"  # layout B: bed 1's feed drop sits left of the full-width train
+        compact = L.get("train") == "compact"
         x_in = tx + (170 if compact else 300)
-        x_end = cx[1] - dx
-        cuts = sorted(h for h in (cx[0] + dx, cx[1] + dx) if x_in < h < x_end)
-        x = x_in
-        for h in cuts:
-            ax.plot([x, h - 7], [fy, fy], **pipe)
-            x = h + 7
-        ax.plot([x, x_end], [fy, fy], **pipe)
         vx = max(cx[1] + dx, beds[1][2]) + 90
-        ax.plot([cx[0] + dx, vx], [vy, vy], **pipe)
-        # feed train (context, not simulated)
+        rx0, ry0, rx1, ry1 = L["receiver"]
+        rcx = 0.5 * (rx0 + rx1)
+        yf = self.cyc.pl.yf
+        mcfg = self.cfg.get("molecules", {}).get("weights", {})
+        w = [mcfg.get(sp, 1.0) for sp in SPECIES]
+        pcfg = self.cfg.get("pipes", {})
+        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 12.0), spacing=pcfg.get("dot_spacing_px", 13.0),
+                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05))
+        bot = lambda fr, k: fr[f"y{k}"][:, 0]  # noqa: E731
+        top = lambda fr, k: fr[f"y{k}"][:, -1]  # noqa: E731
+        tank = lambda fr: fr["y_tank"]  # noqa: E731
+
+        def pos(x):
+            return np.maximum(x, 0.0)
+
+        # --- headers first (branches cross over them with a halo)
+        net.add("feed_hdr_a", [(x_in, fy), (cx[0] - dx, fy)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf)
+        net.add("feed_hdr_b", [(cx[0] - dx, fy), (cx[1] - dx, fy)], lambda d: d["F1_feed"], lambda fr, F: yf)
+        net.add("vent_hdr_a", [(cx[0] + dx, vy), (cx[1] + dx, vy)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0))
+        net.add("vent_hdr_b", [(cx[1] + dx, vy), (vx, vy)], lambda d: -(d["F0_vent"] + d["F1_vent"]),
+                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))]) if F > 0 else bot(fr, 0))
+        net.add("prod_hdr_a", [(cx[0] - dx, py), (cx[1] - dx, py)], lambda d: -d["F0_product"],
+                lambda fr, F: top(fr, 0) if F > 0 else tank(fr))
+        net.add("prod_hdr_b", [(cx[1] - dx, py), (rx0, py)], lambda d: -(d["F0_product"] + d["F1_product"]),
+                lambda fr, F: _mix([(pos(-fr["F0_product"]), top(fr, 0)), (pos(-fr["F1_product"]), top(fr, 1))]) if F > 0 else tank(fr))
+        net.add("eq_bot", [(cx[0], node_b), (cx[1], node_b)], lambda d: d["F1_eq_bot"],
+                lambda fr, F: bot(fr, 0) if F > 0 else bot(fr, 1))
+        net.add("eq_top", [(cx[0], node_t), (cx[1], node_t)], lambda d: d["F1_eq_top"],
+                lambda fr, F: top(fr, 0) if F > 0 else top(fr, 1))
+        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 96)], lambda d: d["F_product_out"], lambda fr, F: tank(fr))
+        # feed train (context, not simulated: tubes without gas)
         if compact:
+            train = [[(tx + 48, fy), (tx + 64, fy)], [(tx + 90, fy), (tx + 100, fy)], [(tx + 152, fy), (x_in, fy)]]
+        else:
+            train = [[(tx + 60, fy), (tx + 101, fy)], [(tx + 131, fy), (tx + 176, fy)], [(tx + 240, fy), (x_in, fy)]]
+        for i, pts in enumerate(train):
+            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None)
+        for k in (0, 1):
+            o = 1 - k
+            fk = lambda d, v, k=k: d[f"F{k}_{v}"]  # noqa: E731
+            net.add(f"noz_b_up{k}", [(cx[k], y_bot), (cx[k], node_b)], lambda d, k=k: -(d[f"F{k}_feed"] + d[f"F{k}_vent"] + d[f"F{k}_eq_bot"]),
+                    lambda fr, F, k=k, o=o: bot(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))]))
+            net.add(f"noz_b_lo{k}", [(cx[k], node_b), (cx[k], split_b)], lambda d, k=k: -(d[f"F{k}_feed"] + d[f"F{k}_vent"]),
+                    lambda fr, F, k=k: bot(fr, k) if F > 0 else yf)
+            net.add(f"feed_br{k}", [(cx[k], split_b), (cx[k] - dx, split_b), (cx[k] - dx, fy)], lambda d, k=k: -d[f"F{k}_feed"],
+                    lambda fr, F, k=k: bot(fr, k) if F > 0 else yf)
+            net.add(f"vent_br{k}", [(cx[k], split_b), (cx[k] + dx, split_b), (cx[k] + dx, vy)], lambda d, k=k: -d[f"F{k}_vent"],
+                    lambda fr, F, k=k: bot(fr, k), halo=True)
+            net.add(f"noz_t_lo{k}", [(cx[k], y_tops[k]), (cx[k], node_t)],
+                    lambda d, k=k: -(d[f"F{k}_product"] + d[f"F{k}_purge"] + d[f"F{k}_eq_top"]),
+                    lambda fr, F, k=k, o=o: top(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_product"]) + pos(fr[f"F{k}_purge"]), tank(fr)),
+                                                                          (pos(fr[f"F{k}_eq_top"]), top(fr, o))]))
+            net.add(f"noz_t_up{k}", [(cx[k], node_t), (cx[k], split_t)], lambda d, k=k: -(d[f"F{k}_product"] + d[f"F{k}_purge"]),
+                    lambda fr, F, k=k: top(fr, k) if F > 0 else tank(fr))
+            net.add(f"prod_br{k}", [(cx[k], split_t), (cx[k] - dx, split_t), (cx[k] - dx, py)], lambda d, k=k: -d[f"F{k}_product"],
+                    lambda fr, F, k=k: top(fr, k) if F > 0 else tank(fr))
+            net.add(f"purge_br{k}", [(cx[k], split_t), (cx[k] + dx, split_t), (cx[k] + dx, pq)], lambda d, k=k: -d[f"F{k}_purge"],
+                    lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("purge_hdr_a", [(rx0 - 18, py), (rx0 - 18, pq), (cx[1] + dx, pq)], lambda d: d["F0_purge"] + d["F1_purge"],
+                lambda fr, F: tank(fr), tube_w=11.0, halo=True)
+        net.add("purge_hdr_b", [(cx[1] + dx, pq), (cx[0] + dx, pq)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0, halo=True)
+        net.finish()
+        geo = dict(cx=cx, dx=dx, fy=fy, vy=vy, py=py, pq=pq, node_b=node_b, split_b=split_b, node_t=node_t, split_t=split_t,
+                   mid=mid, tx=tx, compact=compact, x_in=x_in, vx=vx, rcx=rcx, receiver=(rx0, ry0, rx1, ry1))
+        self._net_key, self._net_obj, self._geo = key, net, geo
+        return net, geo
+
+    def _pid(self, fig, fr):
+        T, L = self.T, self.L
+        ax = fig.add_axes([0, 0, 1, 1], zorder=0)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        net, g = self._net()
+        net.draw_tubes(ax)
+        net.draw_gas(ax, fr, [T[sp] for sp in SPECIES])
+        net.draw_chevrons(ax, fr)
+        cx, dx, fy, vy, py, pq = g["cx"], g["dx"], g["fy"], g["vy"], g["py"], g["pq"]
+        tx, x_in, vx = g["tx"], g["x_in"], g["vx"]
+        mid = g["mid"]
+        self._valve(ax, mid, g["node_b"], fr["open0_eq_bot"], vertical=False)
+        self._valve(ax, mid, g["node_t"], fr["open0_eq_top"], vertical=False)
+        # feed train (context, not simulated)
+        if g["compact"]:
             self._compressor(ax, tx + 24, fy)
             self._vessel(ax, tx + 77, fy - 45, 26, 70, None)
-            ax.plot([tx + 48, tx + 64], [fy, fy], **pipe)
-            ax.plot([tx + 90, tx + 100], [fy, fy], **pipe)
             self._box_icon(ax, tx + 100, fy - 20, 52, 40, "dryer", small=True)
-            ax.plot([tx + 152, x_in], [fy, fy], **pipe)
             self.text(fig, tx, vy + 18, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
                       size=10, color=T["muted"])
         else:
             self._compressor(ax, tx + 34, fy)
             self._vessel(ax, tx + 116, fy - 50, 30, 78, None)
-            ax.plot([tx + 60, tx + 101], [fy, fy], **pipe)
-            ax.plot([tx + 131, tx + 176], [fy, fy], **pipe)
             self._box_icon(ax, tx + 176, fy - 22, 64, 44, "dryer")
-            ax.plot([tx + 240, x_in], [fy, fy], **pipe)
             self.text(fig, tx, fy + 34, "compressor, air receiver, dryer\n7.5 barg, dew point +3 °C (context only)",
                       size=10, color=T["muted"], linespacing=1.3)
         self._box_icon(ax, vx, vy - 15, 56, 30, "silencer", small=True)
         self.text(fig, vx + 64, vy - 9, "vent", size=11, color=T["muted"])
-        # top: nozzles, top equalization, product (left) and purge (right) risers
-        for k in (0, 1):
-            ax.plot([cx[k], cx[k]], [y_tops[k], split_t], **pipe)
-            ax.plot([cx[k] - dx, cx[k] + dx], [split_t, split_t], **pipe)
-            ax.plot([cx[k] - dx, cx[k] - dx], [split_t, py], **pipe)
-            ax.plot([cx[k] + dx, cx[k] + dx], [split_t, py + 20], **thin)
-        ax.plot([cx[0], cx[1]], [node_t, node_t], **pipe)
-        self._valve(ax, mid, node_t, fr["open0_eq_top"], vertical=False)
-        rx0, ry0, rx1, ry1 = L["receiver"]
-        rcx = 0.5 * (rx0 + rx1)
-        ax.plot([cx[0] - dx, rx0], [py, py], **pipe)
-        ax.plot([cx[0] + dx, rx0 - 18], [py + 20, py + 20], **thin)
-        ax.plot([rx0 - 18, rx0 - 18], [py + 20, py], **thin)
+        rx0, ry0, rx1, ry1 = g["receiver"]
+        rcx = g["rcx"]
         self._vessel(ax, rcx, ry0, rx1 - rx0, ry1 - ry0, "N$_2$ receiver")
-        if L["out"] == "right":
-            oy = 0.5 * (ry0 + ry1)
-            ax.plot([rx1, rx1 + 80], [oy, oy], **pipe)
-            self._regulator(ax, rx1 + 26, oy)
-            self._arrow(ax, (rx1 + 42, oy), (rx1 + 100, oy), fr["F_product_out"], T["N2"])
-            self.text(fig, rx1 + 108, oy - 12, "N$_2$ product\n30 SLPM, 6 barg", size=11, linespacing=1.25)
-        else:
-            ax.plot([rcx, rcx], [ry1, ry1 + 70], **pipe)
-            self._regulator(ax, rcx, ry1 + 30, vertical=True)
-            self._arrow(ax, (rcx, ry1 + 46), (rcx, ry1 + 104), fr["F_product_out"], T["N2"])
-            self.text(fig, rcx + 14, ry1 + 66, "N$_2$ product\n30 SLPM\n6 barg", size=11, linespacing=1.25)
-        # valves
+        self._regulator(ax, rcx, ry1 + 30, vertical=True)
+        self.text(fig, rcx + 16, ry1 + 54, "N$_2$ product\n30 SLPM\n6 barg", size=11, linespacing=1.25)
+        # valves on the branches
+        split_b, split_t = g["split_b"], g["split_t"]
         vb = split_b + 0.5 * (fy - split_b)
         vv = split_b + 0.62 * (vy - split_b)
-        vt = py + 0.5 * (split_t - py)
+        vt = py + 0.55 * (split_t - py)
+        vtp = pq + 0.5 * (split_t - pq)
         for k in (0, 1):
             self._valve(ax, cx[k] - dx, vb, fr[f"open{k}_feed"])
             self._valve(ax, cx[k] + dx, vv, fr[f"open{k}_vent"])
             self._valve(ax, cx[k] - dx, vt, fr[f"open{k}_product"])
-            self._valve(ax, cx[k] + dx, vt + 10, fr[f"open{k}_purge"], size=8, needle=True)
-        # flow arrows (+ = into the bed)
-        air, n2c, o2c, neut = T["ink2"], T["N2"], T["O2"], T["ink2"]
-        for k in (0, 1):
-            self._arrow(ax, (cx[k] - dx, fy - 6), (cx[k] - dx, vb + 15), fr[f"F{k}_feed"], air)
-            self._arrow(ax, (cx[k] + dx, vy - 6), (cx[k] + dx, vv + 15), fr[f"F{k}_vent"], o2c)
-            self._arrow(ax, (cx[k] - dx, py + 6), (cx[k] - dx, vt - 15), fr[f"F{k}_product"], n2c)
-            self._arrow(ax, (cx[k] + dx, py + 26), (cx[k] + dx, vt - 2), fr[f"F{k}_purge"], n2c)
-        self._arrow(ax, (mid + 36, node_t), (mid + 110, node_t), fr["F0_eq_top"], neut)
-        self._arrow(ax, (mid + 36, node_b), (mid + 110, node_b), fr["F0_eq_bot"], neut)
-        if L.get("train") != "compact":  # compact train: no room on the header; the drop arrows show the feed
-            self._arrow(ax, (x_in - 56, fy), (x_in - 6, fy), fr["F0_feed"] + fr["F1_feed"], air)
-        self._arrow(ax, (vx - 62, vy), (vx - 8, vy), -(fr["F0_vent"] + fr["F1_vent"]), o2c)
+            self._valve(ax, cx[k] + dx, vtp, fr[f"open{k}_purge"], size=10, needle=True)
 
     def _compressor(self, ax, x, y):
         T = self.T

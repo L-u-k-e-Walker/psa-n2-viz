@@ -156,7 +156,9 @@ def draft_setup(cfg, css_dir):
     d, tm, cyc = frame_cache(cfg["timing"], css_dir=css_dir)
     met = load_metrics(css_dir)
     w = [cfg["molecules"]["weights"][s] for s in SPECIES]
-    mol = molecule_history(d, Packing(), cyc.pl.g.eps, w, cfg["molecules"]["n_ref"], key_extra=str(d["cache_key"]))
+    mc = cfg["molecules"]
+    motion = dict(k=mc.get("speed_gain", 0.25), vmax=mc.get("speed_max", 0.6), jitter=mc.get("jitter", 0.025))
+    mol = molecule_history(d, Packing(), cyc.pl.g.eps, w, mc["n_ref"], key_extra=str(d["cache_key"]), motion=motion)
     return d, tm, cyc, met, mol
 
 
