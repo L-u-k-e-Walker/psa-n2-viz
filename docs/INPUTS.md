@@ -64,6 +64,20 @@ adsorption database records, copied into model/data/isodb/): CT-350 CO₂
 | Bead | radius 0.6 mm (14×28 mesh), porosity 0.55, density 1250 kg/m³, tortuosity 3 | **assumed**: F-200-like 14×28 mesh beads, the small size used in fast-cycle PSA pretreatment layers. The first assumption (7×12 mesh, 2.4 mm, Knudsen diffusion in the 5.7 nm mesopores) gave a water LDF of 6.6e-5 /s; at 120 s cycles the layer could not regenerate, sat at 92 % of its feed loading and passed the water into the CMS (front at z/L 0.88), see docs/LOG.md |
 | Bed packing | inter-particle void 0.40, bulk density 750 kg/m³, total voidage 0.73 | **assumed** (F-200 data sheets give ~770 kg/m³ bulk) |
 
-## To be filled after sizing
+## Sized and assumed plant values
 
-Bed geometry and layer heights, valve constants, purge valve, receiver volume, grid.
+The full table with values and sources is generated from the final state: docs/DESIGN.md
+(tools/design_table.py on model/css/final). How each was set:
+
+| Quantity | Value (180-cell sizing) | Source class | How |
+|---|---|---|---|
+| Column ID | 100 mm | assumed | typical of small CMS generators |
+| CMS height | 0.905 m per bed | sized | product O2 = 4,500 ppm (10 % under the 5,000 ppm spec) at 30 SLPM; secant in ln O2 (model/sizing, sizing_rule.py); 180 cells |
+| Alumina height | 13.1 cm per bed | sized | the alumina captures >= 95 % of the water (CMS water < 5 % of its feed equilibrium, interface y_H2O < 5 % of the feed during production); set at 60 cells, holds at 180 (CMS water 0.6 %) |
+| Purge valve | 3.89e-4 mol/(s bar) | sized | purge of 40 % of the packed volume (normal conditions) per step, M21d Tab. 4.3-2 |
+| Equalization valves | from eq_cv_for | sized | <= 2 % residual pressure difference after the 1 s step |
+| Feed, product, vent valves | 0.12, 0.06, 0.15 mol/(s bar) | assumed | beds peak near 8 bar abs (M21d's reference pressure); blowdown in a few seconds |
+| Receiver | 6 x one bed volume | assumed | M21d's pilot: 12 L receiver for 2 L beds |
+| Delivery pressure | 6.0 barg | assumed | regulator about 1.5 bar below the inlet |
+| Grid | 30 alumina + 180 CMS cells, first-order upwind | user decision | checked against 60 + 360 (G1e); 60 cells under-predicts purity ~3.5x at the same bed |
+
