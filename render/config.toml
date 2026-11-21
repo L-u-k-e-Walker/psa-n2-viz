@@ -3,7 +3,7 @@
 # that snapshot unchanged. Colours come from psan2viz/style.py (validated set, docs/MISSION.md).
 
 [text]
-title = "PSA nitrogen generator"
+title = "CONVENTIONAL CMS PSA N$_2$ GENERATOR"   # PSA, not VPSA: docs/RESEARCH_regeneration.md
 subtitle = "Two carbon-molecular-sieve beds at cyclic steady state"
 footnote = """Isothermal LDF model of both beds, the receiver and the valves, at cyclic steady state; \
 literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, particle size, \
@@ -17,10 +17,12 @@ valve_style = "spool"   # layout F: ball | butterfly | spool | piston; spool (us
 [timing]
 # Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
 # Knots: start, end of equalization, end of the fast early part of production/blowdown, end of the half.
-# Slow motion for the short steps (user, v09 review): equalization 1 s -> 4 s of video (4x slower), then a ramp
-# (real time, ~1.7x, ~3x) into the long steady part (~8x faster). The cycle clock shows the playback speed.
-half_cycle_knots = [0.0, 1.0, 2.5, 5.0, 10.0, 60.0]
-half_video_knots = [0.0, 4.0, 5.5, 7.0, 8.6, 15.0]
+# Slow motion where things happen fast (user, v09/v10 reviews): equalization is exponential with a ~0.15 s time
+# constant (bed 1 goes 1.1 -> 3.1 bar in 0.2 s), so its first 0.3 s get 4.5 s of video (15x slower); then
+# ~3.5x slower to the end of equalization, ~2x slower for the first 2 s of pressurization / blowdown, about
+# real time to 8 s, 2.4x faster to 20 s and 5x faster for the steady rest. Loop 60 s.
+half_cycle_knots = [0.0, 0.3, 1.0, 3.0, 8.0, 20.0, 60.0]
+half_video_knots = [0.0, 4.5, 7.0, 11.5, 17.0, 22.0, 30.0]
 
 [tiers.mock]
 size = [960, 540]
@@ -49,6 +51,9 @@ gif_fps = 15
 gif_max_mb = 50
 ao_samples = 12
 aa_samples = 12
+
+[beds]
+loading_strength = 0.45  # bed colour ramps end on a pale tint (user, v10 review: O2 molecules lost in deep red)
 
 [molecules]
 # trace species are drawn at exaggerated counts (weights shown in the footnote)

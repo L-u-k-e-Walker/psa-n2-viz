@@ -101,13 +101,16 @@ def darken(h, f=0.18):
     return rgb_hex(oklab_to_rgb(lab))
 
 
-def loading_ramp(theme, species, n=256, deep=False, bare_key="bare"):
+def loading_ramp(theme, species, n=256, deep=False, bare_key="bare", strength=None):
     """Sequential one-hue ramp for a species' loading: bare sorbent -> species colour.
 
     ``deep`` ends on a darker step of the hue, so that molecules drawn in the
     species colour stay visible in front of fully loaded particles.
     (psa-viz original; ``bare_key`` added so the alumina layer can start from its own bare colour.)"""
     t = THEMES[theme]
+    if strength is not None:  # a pale ramp: bare -> a tint ``strength`` of the way to the species colour
+        end = rgb_hex(ramp(t[bare_key], t[species], 256)[int(round(float(strength) * 255))])
+        return ramp(t[bare_key], end, n)
     f = (0.30 if theme == "white" else 0.22) if deep else (0.08 if theme == "white" else 0.0)
     return ramp(t[bare_key], darken(t[species], f), n)
 

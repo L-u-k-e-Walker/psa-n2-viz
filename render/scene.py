@@ -60,7 +60,8 @@ def cylinder_mesh(R, z0, z1, th0, th1, n=96, cap=False):
 class BedScene:
     """One bed. ``box`` = (x0, y0, x1, y1) in output pixels: the packed bed's projected extent."""
 
-    def __init__(self, theme, box, z_al, renderer="tachyon", ao=True, aa_samples=12, ao_samples=12, cut_y=0.0):
+    def __init__(self, theme, box, z_al, renderer="tachyon", ao=True, aa_samples=12, ao_samples=12, cut_y=0.0,
+                 loading_strength=None):
         from ovito.data import DataCollection
         from ovito.pipeline import Pipeline, StaticSource
         from ovito.vis import OpenGLRenderer, ParticlesVis, TachyonRenderer, TriangleMeshVis, Viewport
@@ -74,8 +75,8 @@ class BedScene:
         self.jitter = 1.0 + rng.normal(0, 0.035, len(self.base))[:, None]
         self.zrel = self.base[:, 2] / p.H
         self.is_al = self.zrel < z_al
-        self.ramp_cms = loading_ramp(theme, "O2", deep=True)
-        self.ramp_al = loading_ramp(theme, "H2O", deep=True, bare_key="bare_alumina")
+        self.ramp_cms = loading_ramp(theme, "O2", deep=True, strength=loading_strength)
+        self.ramp_al = loading_ramp(theme, "H2O", deep=True, bare_key="bare_alumina", strength=loading_strength)
         # pixel geometry: scale so that the packed height fills the box height
         x0, y0, x1, y1 = box
         self.box = box

@@ -122,7 +122,7 @@ class BedRenderer:
         sc = comp.size[0] / 1920
         self.boxes = [tuple(v * sc for v in b) for b in comp.L["beds"]]
         self.scene = BedScene(theme, self.boxes[0], float(d["z_al"]), renderer=renderer, ao=ao, aa_samples=aa_samples,
-                              ao_samples=ao_samples)
+                              ao_samples=ao_samples, loading_strength=comp.cfg.get("beds", {}).get("loading_strength"))
         self.origins = [self.scene.origin_for(b) for b in self.boxes]
         self.colors = np.array([hex_rgb(THEMES[theme][s]) for s in SPECIES])
         self.q_ref = cyc.pl.q_scale

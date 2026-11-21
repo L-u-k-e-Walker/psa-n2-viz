@@ -78,9 +78,9 @@ LAYOUTS = {
         v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
-        analyzer_w=172, analyzer_h=72, analyzer_gap=52, clock=(752, 66, 44),
-        timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
-        readouts=(1330, 696), footnote=(36, 1072)),
+        analyzer_w=172, analyzer_h=72, analyzer_gap=52,
+        timing=(1330, 52, 1890, 330), pressure=(1330, 396, 1890, 636),  # no product-O2 panel (user, v10 review)
+        readouts=(1330, 690), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -125,8 +125,9 @@ class Composer:
         self.s = size[0] / W
         self.cfg = cfg or {}
         self.unit = self.cfg.get("layout", {}).get("pressure_unit", "barg")
-        self.ramp_cms = loading_ramp(theme, "O2", deep=True)
-        self.ramp_al = loading_ramp(theme, "H2O", deep=True, bare_key="bare_alumina")
+        ls = self.cfg.get("beds", {}).get("loading_strength")
+        self.ramp_cms = loading_ramp(theme, "O2", deep=True, strength=ls)
+        self.ramp_al = loading_ramp(theme, "H2O", deep=True, bare_key="bare_alumina", strength=ls)
         g = cycle.pl.g
         self.cms_cells = g.layer_of == [i for i, lay in enumerate(g.layers) if lay.name == "CMS"][0]
         self.q_ref = cycle.pl.q_scale
@@ -197,7 +198,8 @@ class Composer:
             self._profiles(fig, fr)
             self._timing(fig, fr)
             self._pressure(fig, fr)
-            self._o2(fig, fr)
+            if "o2" in self.L:
+                self._o2(fig, fr)
             self._readouts(fig, fr)
             self._legend(fig)
             self._title(fig, fr)
