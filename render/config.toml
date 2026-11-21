@@ -10,9 +10,9 @@ literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, 
 molecule speed and trace-species counts."""
 
 [layout]
-option = "E"            # A..E; E = twin towers with two 3-way valves per end (user, v06 review)
+option = "F"            # A..F; F = twin towers, L-port 3-way valves, outlet analyzers (user, v08 review)
 pressure_unit = "barg"  # barg | bara
-valve_style = "isa"     # plain | isa | ball: ISA P&ID bodies with diaphragm actuators (user, valve review)
+valve_style = "ball"    # layout F: ball | butterfly | spool | piston (previews/valves2/valve_options.png); provisional until the user picks
 
 [timing]
 # Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).

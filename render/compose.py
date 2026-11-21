@@ -23,6 +23,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Polygon, Rectang
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from pipes import PipeNet, _mix  # noqa: E402
+from valves import STYLES as VALVE_STYLES, ValveArt  # noqa: E402
 from psan2viz.style import SPECIES, SPECIES_ROLE, SPECIES_TEX, THEMES, apply_ramp, loading_ramp, mpl_rc  # noqa: E402
 
 W, H = 1920, 1080
@@ -68,6 +69,16 @@ LAYOUTS = {
         tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1196, 92, 1246, 200), silencer_x=1130,
         gauges=[(150, 212), (1144, 212)], gauge_r=30,
+        timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
+        readouts=(1330, 696), footnote=(36, 1072)),
+    "F": dict(  # twin towers, L-port 3-way valves (bed on the common port, alternatives opposite), outlet analyzers
+        name="twin towers, L-port 3-way valves", pid="lport", title=(36, 24), legend=(1330, 866),
+        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_all", label_side=["left", "right"], label_dy=30,
+        prof_boxes=[(380, 344, 600, 744), (720, 344, 940, 744)],
+        v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
+        outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
+        train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
+        analyzer_w=172, analyzer_h=72, analyzer_gap=52,
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
@@ -228,8 +239,9 @@ class Composer:
             x0, y0, x1, y1 = self.bed_geometry(k)
             left = self.L.get("label_side", ["left", "left"])[k] == "left"
             xl, ha = (x0 - 16, "right") if left else (x1 + 16, "left")
-            self.text(fig, xl, y0 + 4, f"Bed {k + 1}", size=16, ha=ha, fontweight="bold")
-            self.text(fig, xl, y0 + 30, STEP_NAMES[bed_step(fr, k)], size=12, ha=ha, color=T["ink2"], linespacing=1.25)
+            dy = self.L.get("label_dy", 0)
+            self.text(fig, xl, y0 + 4 + dy, f"Bed {k + 1}", size=16, ha=ha, fontweight="bold")
+            self.text(fig, xl, y0 + 30 + dy, STEP_NAMES[bed_step(fr, k)], size=12, ha=ha, color=T["ink2"], linespacing=1.25)
             self.text(fig, xl, y1 - self.z_al * (y1 - y0) * 0.5, "alumina", size=10, ha=ha, va="center", color=T["muted"])
             self.text(fig, xl, y1 - 0.55 * (y1 - y0), "CMS", size=10, ha=ha, va="center", color=T["muted"])
 
@@ -733,7 +745,153 @@ class Composer:
         for k in (0, 1):
             self._gauge(fig, ax, k, fr)
 
+    def _net_lport(self):
+        """Layout F: L-port 3-way valves. Bottom: bed (common, up) to the feed line (inner) or the exhaust
+        (outer, which drops to the exhaust line under the valve); top: bed (common, down) to the product line
+        (inner) or the purge line (outer, which comes down from the purge line above). Flows and compositions
+        as in _net_threeway; straight sample taps from each bed's outlet to its analyzer readout."""
+        key = ("lport", None if self.nozzles is None else tuple(map(tuple, self.nozzles)))
+        if getattr(self, "_net_key", "unset") == key:
+            return self._net_obj, self._geo
+        L, T = self.L, self.T
+        beds = [self.bed_geometry(k) for k in (0, 1)]
+        cx = [0.5 * (b[0] + b[2]) for b in beds]
+        if self.nozzles is not None:
+            y_tops = [nz[0] for nz in self.nozzles]
+            y_bots = [nz[1] for nz in self.nozzles]
+        else:
+            y_tops = [b[1] - 14 for b in beds]
+            y_bots = [b[3] + 14 for b in beds]
+        vt, pu, rl = L["v3_top_y"], L["purge_y"], L["recv_line_y"]
+        vb, ve, fo, vo = L["v3_bot_y"], L["vent_y"], L["feed_out_y"], L["vent_out_y"]
+        ox = L["outer_dx"]
+        xo = [cx[0] - ox, cx[1] + ox]  # outer stubs
+        txf, txv, txp, txq = L["tee_feed_x"], L["tee_vent_x"], L["tee_prod_x"], L["tee_purge_x"]
+        rx0, ry0, rx1, ry1 = L["receiver"]
+        rcx = 0.5 * (rx0 + rx1)
+        sx, tx = L["silencer_x"], L["train_x"]
+        x_in = tx + 170
+        yf = self.cyc.pl.yf
+        mcfg = self.cfg.get("molecules", {}).get("weights", {})
+        w = [mcfg.get(sp, 1.0) for sp in SPECIES]
+        pcfg = self.cfg.get("pipes", {})
+        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 16.0),
+                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05))
+        bot = lambda fr, k: fr[f"y{k}"][:, 0]  # noqa: E731
+        top = lambda fr, k: fr[f"y{k}"][:, -1]  # noqa: E731
+        tank = lambda fr: fr["y_tank"]  # noqa: E731
+
+        def pos(x):
+            return np.maximum(x, 0.0)
+
+        net.add("exh_l", [(cx[0], vb), (xo[0], vb), (xo[0], ve), (txv, ve)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0))
+        net.add("exh_r", [(cx[1], vb), (xo[1], vb), (xo[1], ve), (txv, ve)], lambda d: -d["F1_vent"], lambda fr, F: bot(fr, 1))
+        net.add("purge_l", [(txq, pu), (xo[0], pu), (xo[0], vt), (cx[0], vt)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("purge_r", [(txq, pu), (xo[1], pu), (xo[1], vt), (cx[1], vt)], lambda d: d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        for k in (0, 1):
+            o = 1 - k
+            net.add(f"bed_bot{k}", [(cx[k], y_bots[k]), (cx[k], vb)],
+                    lambda d, k=k: -(d[f"F{k}_feed"] + d[f"F{k}_vent"] + d[f"F{k}_eq_bot"]),
+                    lambda fr, F, k=k, o=o: bot(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))], bot(fr, k)))
+            net.add(f"bed_top{k}", [(cx[k], y_tops[k]), (cx[k], vt)],
+                    lambda d, k=k: -(d[f"F{k}_product"] + d[f"F{k}_purge"] + d[f"F{k}_eq_top"]),
+                    lambda fr, F, k=k, o=o: top(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_product"]) + pos(fr[f"F{k}_purge"]), tank(fr)),
+                                                                          (pos(fr[f"F{k}_eq_top"]), top(fr, o))], top(fr, k)))
+        net.add("feed_l", [(cx[0], vb), (txf, vb)], lambda d: -(d["F0_feed"] + d["F0_eq_bot"]),
+                lambda fr, F: bot(fr, 0) if F > 0 else _mix([(pos(fr["F0_feed"]), yf), (pos(fr["F0_eq_bot"]), bot(fr, 1))], yf))
+        net.add("feed_r", [(txf, vb), (cx[1], vb)], lambda d: d["F1_feed"] + d["F1_eq_bot"],
+                lambda fr, F: _mix([(pos(fr["F1_feed"]), yf), (pos(fr["F1_eq_bot"]), bot(fr, 0))], yf) if F > 0 else bot(fr, 1))
+        net.add("prod_l", [(cx[0], vt), (txp, vt)], lambda d: -(d["F0_product"] + d["F0_eq_top"]),
+                lambda fr, F: top(fr, 0) if F > 0 else _mix([(pos(fr["F0_product"]), tank(fr)), (pos(fr["F0_eq_top"]), top(fr, 1))], tank(fr)))
+        net.add("prod_r", [(txp, vt), (cx[1], vt)], lambda d: d["F1_product"] + d["F1_eq_top"],
+                lambda fr, F: _mix([(pos(fr["F1_product"]), tank(fr)), (pos(fr["F1_eq_top"]), top(fr, 0))], tank(fr)) if F > 0 else top(fr, 1))
+        prod_mix = lambda fr, F: (_mix([(pos(-fr["F0_product"]), top(fr, 0)), (pos(-fr["F1_product"]), top(fr, 1))], tank(fr))  # noqa: E731
+                                  if F > 0 else tank(fr))
+        net.add("prod_up", [(txp, vt), (txp, rl), (txq, rl)], lambda d: -(d["F0_product"] + d["F1_product"]), prod_mix, halo=True)
+        net.add("recv_in", [(txq, rl), (rx0, rl)], lambda d: -(d["F0_product"] + d["F1_product"]) - (d["F0_purge"] + d["F1_purge"]),
+                lambda fr, F: prod_mix(fr, 1.0) if F > 0 else tank(fr))
+        net.add("purge_down", [(txq, rl), (txq, pu)], lambda d: d["F0_purge"] + d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 70)], lambda d: d["F_product_out"], lambda fr, F: tank(fr))
+        net.add("feed_in", [(x_in, fo), (txf, fo), (txf, vb)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf, halo=True)
+        net.add("vent_out", [(txv, ve), (txv, vo), (sx, vo)], lambda d: -(d["F0_vent"] + d["F1_vent"]),
+                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))], bot(fr, 0)) if F > 0 else bot(fr, 0))
+        for i, pts in enumerate([[(tx + 48, fo), (tx + 64, fo)], [(tx + 90, fo), (tx + 100, fo)], [(tx + 152, fo), (x_in, fo)]]):
+            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None)
+        # straight sample taps to the outlet analyzers
+        aw, ah, ag = L["analyzer_w"], L["analyzer_h"], L["analyzer_gap"]
+        y_taps = [y_tops[k] - 10 for k in (0, 1)]
+        boxes = [(cx[0] - ag - aw, y_taps[0] - ah / 2, cx[0] - ag, y_taps[0] + ah / 2),
+                 (cx[1] + ag, y_taps[1] - ah / 2, cx[1] + ag + aw, y_taps[1] + ah / 2)]
+        for k in (0, 1):
+            xe = boxes[k][2] if k == 0 else boxes[k][0]
+            net.add(f"tap{k}", [(cx[k], y_taps[k]), (xe, y_taps[k])], lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, tube_w=7.0)
+        net.finish()
+        geo = dict(cx=cx, xo=xo, vt=vt, pu=pu, rl=rl, vb=vb, ve=ve, fo=fo, vo=vo, tx=tx, sx=sx, rcx=rcx, txf=txf, txp=txp,
+                   txq=txq, receiver=(rx0, ry0, rx1, ry1), y_tops=y_tops, analyzer_boxes=boxes)
+        self._net_key, self._net_obj, self._geo = key, net, geo
+        return net, geo
+
+    def _analyzer(self, fig, ax, box, y):
+        """Outlet analyzer readout: N2, Ar, O2 of the gas leaving the bed (the solver's top cell)."""
+        T = self.T
+        x0, y0, x1, y1 = box
+        ax.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=6",
+                                    fc=T["bg"], ec=T["tube_edge"], lw=1.6 * self.s * 0.72, zorder=6))
+        self.text(fig, x0 + 10, y0 + 6, "outlet", size=9, color=T["muted"])
+        o2 = float(y[IO2])
+        rows = ((IN2, "N$_2$", f"{100 * float(y[IN2]):.2f} %"), (IAR, "Ar", f"{100 * float(y[IAR]):.2f} %"),
+                (IO2, "O$_2$", f"{1e6 * o2:,.0f} ppm" if o2 < 0.01 else f"{100 * o2:.2f} %"))
+        for j, (i, lab, val) in enumerate(rows):
+            yy = y0 + 28 + 15 * j
+            ax.add_patch(plt.Circle((x0 + 14, yy), 3.4, fc=T[SPECIES[i]], ec="none", zorder=7))
+            self.text(fig, x0 + 23, yy, lab, size=10.5, color=T["ink2"], va="center")
+            self.text(fig, x1 - 10, yy, val, size=10.5, ha="right", va="center", fontweight="bold")
+
+    def _pid_lport(self, fig, fr):
+        T = self.T
+        ax = fig.add_axes([0, 0, 1, 1], zorder=0)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        net, g = self._net_lport()
+        net.draw_tubes(ax)
+        net.draw_gas(ax, fr, [T[sp] for sp in SPECIES])
+        net.draw_chevrons(ax, fr)
+        style = self.cfg.get("layout", {}).get("valve_style", "ball")
+        va = ValveArt(ax, T, self.s, style if style in VALVE_STYLES else "ball",
+                      tube_w=self.cfg.get("pipes", {}).get("tube_px", 16.0))
+        cx = g["cx"]
+        eqb, eqt = bool(fr["open0_eq_bot"]), bool(fr["open0_eq_top"])
+        for k in (0, 1):
+            inner, outer = ("r", "l") if k == 0 else ("l", "r")
+            ob = "inner" if (fr[f"open{k}_feed"] or eqb) else ("outer" if fr[f"open{k}_vent"] else None)
+            va.three_way(cx[k], g["vb"], "u", inner, outer, ob)
+            ot = "inner" if (fr[f"open{k}_product"] or eqt) else ("outer" if fr[f"open{k}_purge"] else None)
+            va.three_way(cx[k], g["vt"], "d", inner, outer, ot)
+        va.two_way(g["txf"], 0.5 * (g["vb"] + g["ve"]), bool(fr["open0_feed"]) or bool(fr["open1_feed"]), "v")
+        va.two_way(g["txp"], 0.5 * (g["vt"] + g["pu"]), bool(fr["open0_product"]) or bool(fr["open1_product"]), "v")
+        va.needle(g["txq"], 0.5 * (g["rl"] + g["pu"]), "v")
+        for x, y, lab in ((cx[0] + 62, g["vt"] - 14, "product · top equalization"), (cx[0] + 62, g["pu"] - 10, "purge"),
+                          (cx[0] + 62, g["vb"] - 14, "feed · bottom equalization"), (cx[0] + 62, g["ve"] - 12, "exhaust")):
+            self.text(fig, x, y, lab, size=10, color=T["muted"], va="bottom")
+        tx, fo, vo = g["tx"], g["fo"], g["vo"]
+        self._compressor(ax, tx + 24, fo)
+        self._vessel(ax, tx + 77, fo - 45, 26, 70, None)
+        self._box_icon(ax, tx + 100, fo - 20, 52, 40, "dryer", small=True)
+        self.text(fig, tx, fo + 34, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
+                  size=10, color=T["muted"])
+        self._box_icon(ax, g["sx"], vo - 15, 56, 30, "silencer", small=True)
+        self.text(fig, g["sx"] + 64, vo - 9, "vent", size=11, color=T["muted"])
+        rx0, ry0, rx1, ry1 = g["receiver"]
+        self._vessel(ax, g["rcx"], ry0, rx1 - rx0, ry1 - ry0, "N$_2$ receiver")
+        va.regulator(g["rcx"], ry1 + 30, "v")
+        self.text(fig, g["rcx"] - 14, ry1 + 12, "N$_2$ product\n30 SLPM\n6 barg", size=10.5, linespacing=1.2, ha="right")
+        for k in (0, 1):
+            self._analyzer(fig, ax, g["analyzer_boxes"][k], fr[f"y{k}"][:, -1])
+
     def _pid(self, fig, fr):
+        if self.L.get("pid") == "lport":
+            return self._pid_lport(fig, fr)
         if self.L.get("pid") == "threeway":
             return self._pid_threeway(fig, fr)
         if self.L.get("pid") == "manifold":
