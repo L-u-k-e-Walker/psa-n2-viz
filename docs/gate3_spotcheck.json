@@ -1,0 +1,13 @@
+{
+ "css_state": "model/sizing/runs_n60b/iter01",
+ "frames": {
+  "frame 63 (t = 2.20 s)": 0.0,
+  "frame 369 (t = 46.37 s)": 0.0,
+  "frame 747 (t = 94.26 s)": 0.0
+ },
+ "max_abs_diff": 0.0,
+ "limit": 1e-06,
+ "loop_seam_rms": 3.753891462541425e-05,
+ "loop_seam_max": 0.0005474556426958643,
+ "pass": false
+}

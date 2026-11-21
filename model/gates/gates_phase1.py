@@ -88,7 +88,7 @@ res["G1f"] = dict(
     productivity_Nm3_h_m3=met["productivity_Nm3_h_m3"])
 f = res["G1f"]
 f["checks"] = dict(O2=f["product_O2_ppm"] <= 5000.0, air_factor=2.0 <= f["air_factor"] <= 3.5,
-                   h2o_in_alumina=z_front <= cyc.z_al and q_cms < 0.1,
+                   h2o_in_alumina=q_cms < 0.05 and wf["interface_y_rel"] < 0.05,
                    co2_negligible=f["product_CO2_ppm"] < 0.01 * 1e6 * case.y_feed[sp.index("CO2")],
                    eq_nearly_equal=max(f["eq_residual"]) <= 0.05, regulator_supplied=p_tank_min > P_DELIVER + 0.2)
 f["pass"] = all(f["checks"].values())

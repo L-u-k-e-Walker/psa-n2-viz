@@ -446,8 +446,11 @@ class Plant:
         return out
 
     def run_to_css_proj(self, x0=None, tol=2e-7, plain=12, max_maps=3000, m_max=3000.0, cos_min=0.95,
-                        relax=2, progress=None, checkpoint=None):
+                        relax=2, baseline=1, progress=None, checkpoint=None):
         """CSS by plain half-cycle maps with vector-Aitken extrapolation of the slow variables.
+
+        ``baseline`` = number of full cycles over which each of the two changes is measured (longer
+        baselines filter the fast modes out of the decay estimate of very slow modes).
 
         The CO2 and H2O profiles (trace species: they barely act back on the bulk flow) relax over
         hundreds of half-cycles; the receiver and the bulk loadings relax over tens. Changes are measured over full cycles (two swapped half-maps),
@@ -490,11 +493,11 @@ class Plant:
             if jumped:
                 for _ in range(relax):
                     x = self.project(G(x))
-            x1 = G(x)
-            x2 = G(x1)
-            x3 = G(x2)
-            x4 = G(x3)
-            x5 = G(x4)
+            seq = [G(x)]
+            for _ in range(4 * baseline):
+                seq.append(G(seq[-1]))
+            x1, x3, x5 = seq[0], seq[2 * baseline], seq[4 * baseline]
+            x4 = seq[4 * baseline - 1]
             rms, mx = resid(x4, x5)
             notes = []
             if rms < tol:

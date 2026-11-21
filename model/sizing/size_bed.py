@@ -5,7 +5,8 @@ the receiver (6 bed volumes). Adjusted, one warm-started CSS solve per iteration
   * h_cms   so that product O2 = O2_TARGET (10 % under the 5000 ppm spec; secant in ln O2)
   * cv_purge so that the purge per step = 40 % of the packed-bed volume at normal
             conditions (M21d reference process, Tab. 4.3-2)
-  * h_al    grown by 30 % if the H2O front (y_H2O >= 1 % of the feed) passes 80 % of the layer
+  * h_al    grown by 30 % unless the alumina captures >= 95 % of the water (CMS water loading
+            < 5 % of feed equilibrium and interface y_H2O < 5 % of the feed during production)
 Writes runs/iterNN/ (CSS states) and sizing.json. Set OPENBLAS_NUM_THREADS.
 
 usage: python size_bed.py [--start '{"h_cms": 0.6, ...}'] [--warm DIR] [--max-iter 8]
@@ -89,7 +90,7 @@ for it in range(1, a.max_iter + 1):
     log("  -> " + json.dumps({k: (round(v, 5) if isinstance(v, float) else v) for k, v in rec.items() if k != "params"}))
     ok_o2 = abs(met["product_O2_ppm"] / O2_TARGET - 1) < O2_TOL
     ok_purge = abs(purge_step / purge_target - 1) < 0.03
-    ok_h2o = z_front <= 0.8 * cyc.z_al and q_cms < 0.1  # loading front in the lower 80 % of the alumina
+    ok_h2o = q_cms < 0.05 and wf["interface_y_rel"] < 0.05  # the alumina captures >= 95 % of the water
     if ok_o2 and ok_purge and ok_h2o:
         log("  sized.")
         break
@@ -97,13 +98,18 @@ for it in range(1, a.max_iter + 1):
     params["cv_purge"] = params["cv_purge"] * purge_target / purge_step
     if not ok_h2o:
         params["h_al"] = round(params["h_al"] * 1.3, 4)
-    pts = [(h["params"]["h_cms"], math.log(h["O2_ppm"])) for h in history]
+    # secant in ln O2 vs h_cms, only between points with the purge on target (within 5 %) and the
+    # same alumina layer: a purge or alumina change moves O2 too and would corrupt the slope
+    # (the first 60-cell run, runs_n60b, overshot to 0.75 m that way)
+    good = [h for h in history if abs(h["purge_step_mol"] / h["purge_target_mol"] - 1) < 0.05
+            and abs(h["params"]["h_al"] - params["h_al"]) < 1e-6]
+    pts = [(h["params"]["h_cms"], math.log(h["O2_ppm"])) for h in good]
     if len(pts) >= 2 and abs(pts[-1][0] - pts[-2][0]) > 1e-4:
         slope = (pts[-1][1] - pts[-2][1]) / (pts[-1][0] - pts[-2][0])
     else:
         slope = a.slope  # 1/m, first guess (ln O2 per metre of CMS)
     slope = min(slope, -1.0)
-    dh = (math.log(O2_TARGET) - pts[-1][1]) / slope
+    dh = (math.log(O2_TARGET) - math.log(met["product_O2_ppm"])) / slope
     params["h_cms"] = round(float(np.clip(params["h_cms"] + dh, 0.5 * params["h_cms"], 1.6 * params["h_cms"])), 4)
     x0 = x
 (HERE / f"sizing_{a.out}.json").write_text(json.dumps(dict(target_O2_ppm=O2_TARGET, history=history, final=history[-1]),

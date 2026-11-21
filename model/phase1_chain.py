@@ -3,7 +3,7 @@
 User decision (docs/MISSION.md, G1e): first-order upwind with 180 CMS + 30 alumina cells,
 checked against 360 + 60. Steps (logged to model/phase1_chain.log; a step whose output exists is
 skipped, so the chain can be restarted):
-  0. wait for the 60-cell sizing (model/sizing/sizing_runs_n60b.json)
+  0. wait for the 60-cell sizing (model/sizing/sizing_runs_n60c.json)
   1. upsample its last iteration to 180 cells
   2. size_bed.py at 180 cells (CSS tolerance 3e-5: product O2 and recovery are converged far below
      that; only the slow trace profiles remain), warm-started, up to 3 iterations
@@ -41,7 +41,7 @@ def run(cmd, cwd):
         sys.exit(r.returncode)
 
 
-j60 = HERE / "sizing" / "sizing_runs_n60b.json"
+j60 = HERE / "sizing" / "sizing_runs_n60c.json"
 log("waiting for the 60-cell sizing" if not j60.exists() else "60-cell sizing found")
 while not j60.exists():
     time.sleep(30)
@@ -50,14 +50,16 @@ p60 = n60["final"]["params"]
 it60 = n60["final"]["iter"]
 hist = n60["history"]
 slope = -3.52  # measured between 0.60 and 0.93 m of CMS at 60 cells (docs/LOG.md)
-if len(hist) >= 2:
-    a, b = hist[-2], hist[-1]
+good = [h for h in hist if abs(h["purge_step_mol"] / h["purge_target_mol"] - 1) < 0.05
+        and abs(h["params"]["h_al"] - p60["h_al"]) < 1e-6]  # same filter as size_bed.py
+if len(good) >= 2:
+    a, b = good[-2], good[-1]
     if abs(b["params"]["h_cms"] - a["params"]["h_cms"]) > 1e-4:
         slope = (math.log(b["O2_ppm"]) - math.log(a["O2_ppm"])) / (b["params"]["h_cms"] - a["params"]["h_cms"])
 log(f"60-cell sizing: {p60}, O2 {n60['final']['O2_ppm']:.0f} ppm, slope {slope:.2f} /m")
 start = HERE / "sizing" / "n180_start.npy"
 if not start.exists():
-    run(PY + [HERE / "upsample.py", HERE / "sizing" / "runs_n60b" / f"iter{it60:02d}", start,
+    run(PY + [HERE / "upsample.py", HERE / "sizing" / "runs_n60c" / f"iter{it60:02d}", start,
               json.dumps({"n_al": 30, "n_cms": 180})], ROOT)
 s180 = HERE / "sizing" / "sizing_runs_n180.json"
 if not s180.exists():

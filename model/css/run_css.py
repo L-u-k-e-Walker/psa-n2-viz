@@ -32,6 +32,8 @@ ap.add_argument("--max-iter", type=int, default=300)
 ap.add_argument("--method", default="proj", choices=["proj", "nk", "anderson"])
 ap.add_argument("--cos-min", type=float, default=0.9)
 ap.add_argument("--m-max", type=float, default=10.0)
+ap.add_argument("--baseline", type=int, default=1)
+ap.add_argument("--relax", type=int, default=2)
 a = ap.parse_args()
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
@@ -62,7 +64,7 @@ def checkpoint(xc):
 
 
 if a.method == "proj":
-    x, hist = pl.run_to_css_proj(x0=x0, tol=a.tol, plain=a.plain, cos_min=a.cos_min, m_max=a.m_max, checkpoint=checkpoint, progress=lambda h: log(
+    x, hist = pl.run_to_css_proj(x0=x0, tol=a.tol, plain=a.plain, cos_min=a.cos_min, m_max=a.m_max, baseline=a.baseline, relax=a.relax, checkpoint=checkpoint, progress=lambda h: log(
         f"  {h['kind']:6s} {h['iter']:3d}  rms {h['rms']:.3e}  max {h['max']:.3e}  maps {h['maps']:4d}  "
         f"{h['wall_s']:.0f}s  {h.get('note', '')}"))
 elif a.method == "nk":

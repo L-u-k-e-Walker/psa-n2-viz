@@ -205,3 +205,16 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   along it. Anderson mixing of the full-cycle map on the slow groups did not speed it up. Sizing uses a
   3e-5 target (O2 converged); the final state gets a Newton-Krylov solve on the trace subspace
   (`Plant.run_to_css_trace_nk`, full-cycle maps, bulk held at its CSS).
+- runs_n60b iterations 1-5 (1.16 -> 1.15 -> 0.75 -> 1.06 -> 1.22 m CMS; alumina 0.10 -> 0.29 m): product O2
+  4383, 3014, 16890, 7133, 4029 ppm; air factor 3.15, 3.30, 2.93, 3.43, 3.87. Two faults in the sizing loop,
+  not in the model: (1) the loading criterion grew the alumina every iteration: the alumina's strong water
+  site fills at RH ~1 %, so any trace of water reads as "loaded" and the front always sat at the layer top
+  even when the CMS held < 1 % of its feed-equilibrium water; (2) the secant mixed a purge change
+  (iteration 1 had half the target purge) with the CMS change and overshot to 0.75 m. The run was stopped
+  (and the waiting 180-cell chain with it).
+- Fixes: the water criterion is now "the alumina captures >= 95 % of the water" (CMS water < 5 % of feed
+  equilibrium and interface y_H2O during production < 5 % of the feed; MISSION G1f updated); the secant uses
+  only iterations with the purge within 5 % of target and the same alumina. Iteration 2 of runs_n60b
+  (1.15 m CMS, 13.1 cm alumina, purge on target) meets the new criterion (CMS 2.3 %, interface 3.0 %);
+  iteration 1 (10.1 cm) narrowly fails it (interface 5.5 %), so the alumina stays at 13.1 cm. Restarted as
+  runs_n60c from 1.04 m (secant from iteration 2 with -3.52 /m), then the chain (180 cells -> 360 cells).

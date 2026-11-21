@@ -19,9 +19,10 @@ from frames import CSS_DIR, frame_cache  # noqa: E402
 from psan2viz import css  # noqa: E402
 from psan2viz.analysis import Cycle  # noqa: E402
 
+CSS = Path(sys.argv[1]) if len(sys.argv) > 1 else CSS_DIR
 cfg = tomllib.loads((ROOT / "render" / "config.toml").read_text())
-d, tm, _ = frame_cache(cfg["timing"])
-case, pl, x0 = css.load(CSS_DIR)
+d, tm, _ = frame_cache(cfg["timing"], css_dir=CSS)
+case, pl, x0 = css.load(CSS)
 x_end, recs = pl.run_cycle(x0)  # independent re-integration
 cyc = Cycle(pl, recs)
 picks = [int(len(d["t_video"]) * f) for f in (0.07, 0.41, 0.83)]
@@ -36,7 +37,7 @@ for f in picks:
         worst = max(worst, abs(float(d[key][f]) - float(fr[key])))
     diffs[f"frame {f} (t = {d['t_cycle'][f]:.2f} s)"] = worst
 rms, mx = pl.norm_change(x_end, x0)
-out = dict(frames=diffs, max_abs_diff=max(diffs.values()), limit=1e-6, loop_seam_rms=rms, loop_seam_max=mx)
+out = dict(css_state=str(CSS), frames=diffs, max_abs_diff=max(diffs.values()), limit=1e-6, loop_seam_rms=rms, loop_seam_max=mx)
 out["pass"] = out["max_abs_diff"] < 1e-6 and mx < 1e-4
 (ROOT / "docs" / "gate3_spotcheck.json").write_text(json.dumps(out, indent=1))
 print(json.dumps(out, indent=1))
