@@ -73,7 +73,7 @@ LAYOUTS = {
         readouts=(1330, 696), footnote=(36, 1072)),
     "F": dict(  # twin towers, L-port 3-way valves (bed on the common port, alternatives opposite), outlet analyzers
         name="twin towers, L-port 3-way valves", pid="lport", title=(36, 24), legend=(1330, 866),
-        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_all", label_side=["left", "right"], label_dy=30,
+        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_state", label_side=["left", "right"], label_dy=30,
         prof_boxes=[(380, 344, 600, 744), (720, 344, 940, 744)],
         v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
@@ -1147,7 +1147,64 @@ class Composer:
                                         color=T[SPECIES[i]], mec=T["bg"], transform=fig.transFigure, figure=fig))
             self.text(fig, xx + 12, y, SPECIES_TEX[SPECIES[i]], size=10.5, color=T["ink2"])
 
+    def _bed_state_panel(self, fig, box, k, fr):
+        """One bed, aligned with its height: pressure bar | O2 in the gas (linear) | sorbent loading (% of feed equilibrium)."""
+        T = self.T
+        x0, y0, x1, y1 = box
+        wb, g1, g2 = 26, 14, 12
+        wo = (x1 - x0 - wb - g1 - g2) * 0.5
+        bp = (x0, y0, x0 + wb, y1)
+        bo = (x0 + wb + g1, y0, x0 + wb + g1 + wo, y1)
+        bl = (bo[2] + g2, y0, x1, y1)
+        # pressure bar
+        P = self.p_disp(float(fr[f"P{k}"]))
+        a = self.box_axes(fig, bp)
+        a.bar([0], [max(P, 0.0)], width=1.0, color=T["metal"], edgecolor="none")
+        a.set(xlim=(-0.5, 0.5), ylim=(0, 8.5), xticks=[], yticks=[0, 4, 8])
+        a.tick_params(length=0, labelsize=self.fs(10))
+        a.grid(False)
+        for sp_ in a.spines.values():
+            sp_.set_visible(True)
+            sp_.set_color(T["axis"])
+        self.text(fig, bp[0] + wb / 2, y0 - 16, f"{P:.1f}", size=11, ha="center", fontweight="bold")
+        self.text(fig, bp[0] + wb / 2, y1 + 22, "barg", size=10, ha="center", color=T["muted"])
+        # O2 in the gas, linear
+        y = fr[f"y{k}"]
+        a = self.box_axes(fig, bo)
+        a.fill_betweenx(self.z, 0, 100 * y[IO2], color=T["O2"], alpha=0.18, lw=0)
+        a.plot(100 * y[IO2], self.z, color=T["O2"], lw=2.4 * self.s)
+        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        a.set(xlim=(0, self.o2_xmax), ylim=(0, 1), xticks=list(range(0, self.o2_xmax + 1, 10 if self.o2_xmax <= 30 else 20)), yticks=[])
+        self._axis_style(a)
+        self.text(fig, bo[0], y0 - 30, "O$_2$ in gas", size=10, color=T["ink2"])
+        self.text(fig, bo[0] + 8, y1 + 22, "O$_2$ %", size=10, color=T["muted"])
+        # sorbent loading, % of the local feed-equilibrium loading
+        q = fr[f"q{k}"]
+        rel = 100 * q / self.q_ref
+        al = ~self.cms_cells
+        a = self.box_axes(fig, bl)
+        a.fill_betweenx(self.z, 0, rel[IN2], color=T["N2"], alpha=0.16, lw=0)
+        a.plot(rel[IN2], self.z, color=T["N2"], lw=2.0 * self.s)
+        a.fill_betweenx(self.z, 0, rel[IO2], color=T["O2"], alpha=0.22, lw=0)
+        a.plot(rel[IO2], self.z, color=T["O2"], lw=2.4 * self.s)
+        zz = np.where(al, self.z, np.nan)
+        a.plot(np.where(al, rel[IH2O], np.nan), zz, color=T["H2O"], lw=2.4 * self.s)
+        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        a.set(xlim=(0, 105), ylim=(0, 1), xticks=[0, 50, 100], yticks=[])
+        self._axis_style(a)
+        self.text(fig, bl[0] + 4, y0 - 30, "loading", size=10, color=T["ink2"])
+        self.text(fig, bl[0], y1 + 22, "% of feed eq.", size=10, color=T["muted"])
+        for j, (i, lab) in enumerate(((IO2, "O$_2$"), (IN2, "N$_2$"), (IH2O, "H$_2$O"))):
+            xx = bl[0] + j * 30
+            fig.lines.append(plt.Line2D([self.fx(xx + 4)], [self.fy(y0 - 6)], marker="o", ms=5 * self.s, color=T[SPECIES[i]],
+                                        mec=T["bg"], transform=fig.transFigure, figure=fig))
+            self.text(fig, xx + 10, y0 - 13, lab, size=9, color=T["ink2"])
+
     def _profiles(self, fig, fr):
+        if self.L["prof"] == "per_bed_state":
+            for k in (0, 1):
+                self._bed_state_panel(fig, self.L["prof_boxes"][k], k, fr)
+            return
         if self.L["prof"] == "per_bed_all":
             for k in (0, 1):
                 box = self.L["prof_boxes"][k]
