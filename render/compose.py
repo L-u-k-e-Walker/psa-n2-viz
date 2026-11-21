@@ -1183,13 +1183,21 @@ class Composer:
         rel = 100 * q / self.q_ref
         al = ~self.cms_cells
         a = self.box_axes(fig, bl)
-        a.fill_betweenx(self.z, 0, rel[IN2], color=T["N2"], alpha=0.16, lw=0)
-        a.plot(rel[IN2], self.z, color=T["N2"], lw=2.0 * self.s)
-        a.fill_betweenx(self.z, 0, rel[IO2], color=T["O2"], alpha=0.22, lw=0)
-        a.plot(rel[IO2], self.z, color=T["O2"], lw=2.4 * self.s)
-        zz = np.where(al, self.z, np.nan)
-        a.plot(np.where(al, rel[IH2O], np.nan), zz, color=T["H2O"], lw=2.4 * self.s)
-        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        # O2 and N2 over the CMS; water over the alumina layer (each sorbent's own feed equilibrium; the lines
+        # are not joined across the layer boundary, where the sorbent changes)
+        cm = self.cms_cells
+        zc = self.z[cm]
+        a.fill_betweenx(zc, 0, rel[IN2][cm], color=T["N2"], alpha=0.16, lw=0)
+        a.plot(rel[IN2][cm], zc, color=T["N2"], lw=2.0 * self.s)
+        a.fill_betweenx(zc, 0, rel[IO2][cm], color=T["O2"], alpha=0.22, lw=0)
+        a.plot(rel[IO2][cm], zc, color=T["O2"], lw=2.4 * self.s)
+        za = np.concatenate([[0.0], self.z[al], [self.z_al]])
+        wa = np.concatenate([[rel[IH2O][al][0]], rel[IH2O][al], [rel[IH2O][al][-1]]])
+        a.fill_betweenx(za, 0, wa, color=T["H2O"], alpha=0.30, lw=0)
+        a.plot(wa, za, color=T["H2O"], lw=2.0 * self.s)
+        a.axhline(self.z_al, color=T["axis"], lw=1.0 * self.s)
+        a.text(103, 0.5 * self.z_al, "H$_2$O\non alumina", ha="right", va="center", fontsize=self.fs(8),
+               color=T["ink2"], linespacing=1.0)
         a.set(xlim=(0, 105), ylim=(0, 1), xticks=[0, 50, 100], yticks=[])
         self._axis_style(a)
         self.text(fig, bl[0] + 4, y0 - 30, "loading", size=10, color=T["ink2"])

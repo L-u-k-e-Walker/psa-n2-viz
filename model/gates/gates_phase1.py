@@ -57,19 +57,24 @@ sym = cyc.symmetry(240)
 res["G1d"] = dict(max_scaled_diff=sym, limit=1e-4, pass_=sym < 1e-4)
 res["G1d"]["pass"] = res["G1d"].pop("pass_")
 
-# ---- G1e: grid (N vs 2N)
+# ---- G1e: grid (N vs 2N). The N state is the 180-cell sized state (model/sizing/runs_n180b/iter02); the 2N
+# state is model/grid/2N (360 cells), which the user chose as the final state after this gate (2026-11-21).
+N_STATE = ROOT / "model" / "sizing" / "runs_n180b" / "iter02" / "metrics.json"
 g2 = GRID_2N / "metrics.json"
-if g2.exists():
+if g2.exists() and N_STATE.exists():
+    m1 = json.loads(N_STATE.read_text())
     m2 = json.loads(g2.read_text())
-    dO2 = abs(m2["product_O2_ppm"] / met["product_O2_ppm"] - 1)
-    dR = 100 * abs(m2["recovery_N2"] - met["recovery_N2"])
-    res["G1e"] = dict(N=[pl.N, 2 * pl.N], product_O2_ppm=[met["product_O2_ppm"], m2["product_O2_ppm"]],
-                      recovery_N2=[met["recovery_N2"], m2["recovery_N2"]], d_O2_rel=dO2, d_recovery_pp=dR,
-                      limits=dict(d_O2_rel=0.05, d_recovery_pp=1.0))
+    dO2 = abs(m2["product_O2_ppm"] / m1["product_O2_ppm"] - 1)
+    dR = 100 * abs(m2["recovery_N2"] - m1["recovery_N2"])
+    # first-order scheme: ln(O2) error ~ 1/N, so ln O2(inf) ~ 2 ln O2(2N) - ln O2(N)
+    o2_inf = m2["product_O2_ppm"] ** 2 / m1["product_O2_ppm"]
+    res["G1e"] = dict(N=[180, 360], product_O2_ppm=[m1["product_O2_ppm"], m2["product_O2_ppm"]],
+                      recovery_N2=[m1["recovery_N2"], m2["recovery_N2"]], d_O2_rel=dO2, d_recovery_pp=dR,
+                      limits=dict(d_O2_rel=0.05, d_recovery_pp=1.0), O2_extrapolated_ppm=o2_inf,
+                      note="failed; user decision: the 360-cell state is the final state, G1e reported as not met")
     res["G1e"]["pass"] = dO2 < 0.05 and dR < 1.0
 else:
     res["G1e"] = dict(pass_=None, note="model/grid/2N not run yet")
-
 # ---- G1f: sanity
 ts, frames = cyc.sample(40)
 wf = cyc.h2o_front(frames)

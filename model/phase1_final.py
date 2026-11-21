@@ -53,12 +53,12 @@ def find_sized():
 
 final = HERE / "css" / "final"
 if not (final / "metrics.json").exists():
-    log("waiting for a sized 180-cell state")
-    src, rec = find_sized()
-    while src is None:
+    # user decision after G1e (2026-11-21): the 360-cell state (model/grid/2N, the 180-cell sized beds on twice
+    # the cells) is the final state; its trace profiles are converged here
+    src = HERE / "grid" / "2N"
+    while not (src / "metrics.json").exists():
         time.sleep(60)
-        src, rec = find_sized()
-    log(f"sized 180-cell state {src}: {rec['params']}, O2 {rec['O2_ppm']:.0f} ppm")
+    log(f"final source: 360-cell state {src}")
     run(PY + [HERE / "css" / "trace_css.py", src, final, "--tol", "1e-6", "--rtol", "1e-7", "--march-max", "3000", "--accel"],
         HERE / "css")
 met = json.loads((final / "metrics.json").read_text())

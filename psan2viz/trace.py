@@ -95,7 +95,7 @@ class TraceMarch:
 
 
     def march_accel(self, z0, tol=1e-7, max_cycles=5000, relax=10, cos_min=0.999, lam_rtol=0.2, max_step=0.1,
-                    progress=None):
+                    m_max=1500.0, quiet=5.0, progress=None):
         """Trace cycles with single-mode jumps. On the frozen bulk the slow mode (water front creeping
         through the alumina, CO2 along it) decays geometrically (0.9993-0.9995 per cycle at 60 cells), so
         after ``relax`` plain cycles three more give changes d1, d2, d3; if aligned (cosines >= cos_min)
@@ -128,9 +128,12 @@ class TraceMarch:
             n1, n2, n3 = (float(np.linalg.norm(v)) for v in (d1, d2, d3))
             c12, c23 = float(d1 @ d2) / (n1 * n2), float(d2 @ d3) / (n2 * n3)
             l12, l23 = float(d2 @ d1) / (n1 * n1), float(d3 @ d2) / (n2 * n2)
-            if (min(c12, c23) >= cos_min and 0.0 < l12 < 1.0 and 0.0 < l23 < 1.0
+            # near the target the decay estimates are noise and max_step / max|d| grows without bound (the
+            # 180-cell final jumped 83,000 cycles at rms 1.7e-7): no jumps within quiet x tol,
+            # and never more than m_max cycles
+            if (rms > quiet * tol and min(c12, c23) >= cos_min and 0.0 < l12 < 1.0 and 0.0 < l23 < 1.0
                     and abs(l23 - l12) <= lam_rtol * (1.0 - l23)):
-                m = min(l23 / (1.0 - l23), max_step / float(np.abs(d3).max()))
+                m = min(l23 / (1.0 - l23), max_step / float(np.abs(d3).max()), m_max)
                 z = np.maximum(z3 + m * d3 * self.sT, 0.0)
                 jumped += m
                 note = f"jump {m:.0f} (lam {l23:.5f})"
