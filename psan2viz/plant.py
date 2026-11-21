@@ -352,6 +352,181 @@ class Plant:
             x = self.project(x_new)
         return x, hist
 
+    def run_to_css_nk(self, x0=None, tol=2e-7, plain=12, newton_max=20, krylov=40, eta=1e-2, h_rms=1e-4,
+                      progress=None):
+        """CSS by Jacobian-free Newton-Krylov on the swapped half-cycle map (normalized state).
+
+        ``plain`` plain iterations first (start-up transient), then Newton steps: GMRES solves
+        (G' - I) d = -(G(z) - z) with finite-difference Jacobian-vector products (one half-cycle
+        each, perturbation of RMS size ``h_rms``), then a backtracking line search on the residual
+        RMS with the state kept physical. Returns (x_css, history)."""
+        from scipy.sparse.linalg import LinearOperator, gmres
+
+        P = self.n_phys
+        s = self.scale[:P]
+        hist = []
+        t0 = time.time()
+        n_maps = [0]
+
+        def G(x):
+            n_maps[0] += 1
+            gx, _ = self.half_map(x)
+            return gx
+
+        def note(kind, rms, mx, extra=""):
+            hist.append(dict(iter=len(hist) + 1, kind=kind, rms=rms, max=mx, maps=n_maps[0], wall_s=time.time() - t0))
+            if progress:
+                progress(dict(hist[-1], note=extra))
+
+        x = self.initial_state() if x0 is None else x0.copy()
+        gx = G(x)
+        for _ in range(plain):
+            f = (gx[:P] - x[:P]) / s
+            rms = float(np.sqrt(np.mean(f * f)))
+            note("plain", rms, float(np.abs(f).max()))
+            if rms < tol:
+                return gx, hist
+            x = self.project(gx)
+            gx = G(x)
+        for _ in range(newton_max):
+            f = (gx[:P] - x[:P]) / s
+            rms = float(np.sqrt(np.mean(f * f)))
+            note("newton", rms, float(np.abs(f).max()))
+            if rms < tol:
+                return gx, hist
+            z = x[:P] / s
+
+            def Jv(v, x=x, z=z, f=f):
+                nv = float(np.linalg.norm(v))
+                if nv == 0.0:
+                    return np.zeros_like(v)
+                h = h_rms * np.sqrt(P) / nv
+                xp = x.copy()
+                xp[:P] = (z + h * v) * s
+                fp = (G(xp)[:P] - xp[:P]) / s
+                return (fp - f) / h
+
+            A = LinearOperator((P, P), matvec=Jv, dtype=float)
+            d, info = gmres(A, -f, rtol=eta, restart=krylov, maxiter=2)
+            accepted, rn, fn, lam = False, rms, f, 0.0
+            for lam in (1.0, 0.5, 0.25, 0.1):
+                xn = x.copy()
+                xn[:P] = (z + lam * d) * s
+                xn = self.project(xn)
+                gn = G(xn)
+                fn = (gn[:P] - xn[:P]) / s
+                rn = float(np.sqrt(np.mean(fn * fn)))
+                if rn < rms:
+                    x, gx, accepted = xn, gn, True
+                    break
+            if progress:
+                progress(dict(iter=len(hist), kind="step", rms=rn, max=float(np.abs(fn).max()), maps=n_maps[0],
+                              wall_s=time.time() - t0, note=f"gmres info {info}, lambda {lam}, accepted {accepted}"))
+            if not accepted:  # fall back to a plain iteration
+                x = self.project(gx)
+                gx = G(x)
+        return gx, hist
+
+    def slow_sets(self):
+        """State indices of the slow variables: the CO2 and H2O loadings in both beds, per species."""
+        sp = list(self.case.species)
+        n, N = self.n, self.N
+        out = {}
+        for name in ("CO2", "H2O"):
+            i = sp.index(name)
+            out[name] = np.concatenate([np.arange(sl.start + n * N + i * N, sl.start + n * N + (i + 1) * N)
+                                        for sl in self.s_bed])
+        return out
+
+    def run_to_css_proj(self, x0=None, tol=2e-7, plain=12, max_maps=3000, m_max=3000.0, cos_min=0.95,
+                        progress=None, checkpoint=None):
+        """CSS by plain half-cycle maps with vector-Aitken extrapolation of the slow variables.
+
+        The CO2 and H2O loadings (trace species: they barely act back on the bulk flow) relax over
+        hundreds of half-cycles. Changes are measured over full cycles (two swapped half-maps),
+        because the bed-to-bed difference flips sign at every swap and hides the slow drift in
+        consecutive half-map changes. Every fifth map, for each of the two species, two consecutive
+        full-cycle changes d1, d2 of its loadings give a decay factor lam = d2.d1 / d1.d1 per cycle;
+        if they point the same way (cosine >= cos_min) and 0 < lam < 1, the loadings jump by the
+        rest of the geometric series, lam/(1-lam) d2 (capped at m_max cycles). All other variables
+        relax by the plain maps in between. Returns (x_css, history)."""
+        P = self.n_phys
+        s = self.scale[:P]
+        sets = self.slow_sets()
+        hist = []
+        t0 = time.time()
+        n_maps = [0]
+
+        def G(x):
+            n_maps[0] += 1
+            gx, _ = self.half_map(x)
+            return gx
+
+        def resid(x, gx):
+            f = (gx[:P] - x[:P]) / s
+            return float(np.sqrt(np.mean(f * f))), float(np.abs(f).max())
+
+        x = self.initial_state() if x0 is None else x0.copy()
+        for _ in range(plain):
+            gx = G(x)
+            rms, mx = resid(x, gx)
+            hist.append(dict(iter=len(hist) + 1, kind="plain", rms=rms, max=mx, maps=n_maps[0], wall_s=time.time() - t0))
+            if progress:
+                progress(dict(hist[-1], note=""))
+            if rms < tol:
+                return gx, hist
+            x = self.project(gx)
+        while n_maps[0] < max_maps:
+            x1 = G(x)
+            x2 = G(x1)
+            x3 = G(x2)
+            x4 = G(x3)
+            x5 = G(x4)
+            rms, mx = resid(x4, x5)
+            notes = []
+            if rms < tol:
+                hist.append(dict(iter=len(hist) + 1, kind="done", rms=rms, max=mx, maps=n_maps[0], wall_s=time.time() - t0))
+                if progress:
+                    progress(dict(hist[-1], note=""))
+                return x5, hist
+            xn = x5.copy()
+            for name, idx in sets.items():
+                d1 = (x3[idx] - x1[idx]) / s[idx]
+                d2 = (x5[idx] - x3[idx]) / s[idx]
+                n1, n2 = float(np.linalg.norm(d1)), float(np.linalg.norm(d2))
+                if n1 == 0.0 or n2 == 0.0:
+                    continue
+                cos = float(d1 @ d2) / (n1 * n2)
+                lam = float(d2 @ d1) / (n1 * n1)
+                if cos >= cos_min and 0.0 < lam < 1.0:
+                    m = min(lam / (1.0 - lam), m_max)
+                    xn[idx] = x5[idx] + m * d2 * s[idx]
+                    notes.append(f"{name}: lam {lam:.4f} jump {m:.0f}")
+                else:
+                    notes.append(f"{name}: no jump (cos {cos:.2f}, lam {lam:.3f})")
+            x = self.project(xn)
+            hist.append(dict(iter=len(hist) + 1, kind="aitken", rms=rms, max=mx, maps=n_maps[0], wall_s=time.time() - t0))
+            if progress:
+                progress(dict(hist[-1], note="; ".join(notes)))
+            if checkpoint:
+                checkpoint(x)
+        return x, hist
+
+    def residual_breakdown(self, x, gx):
+        """RMS of the normalized half-map residual per (bed part, species): diagnostics for CSS solvers."""
+        n, N = self.n, self.N
+        f = (gx - x) / self.scale
+        out = {}
+        sp = list(self.case.species)
+        for k, sl in enumerate(self.s_bed):
+            blk = f[sl]
+            for part, off in (("c", 0), ("q", n * N)):
+                for i, name in enumerate(sp):
+                    v = blk[off + i * N: off + (i + 1) * N]
+                    out[f"bed{k}.{part}.{name}"] = float(np.sqrt(np.mean(v * v)))
+        out["tank"] = float(np.sqrt(np.mean(f[self.s_t] ** 2)))
+        return out
+
     # --------------------------------------------------------------- results
     def cycle_metrics(self, recs):
         cs = self.case

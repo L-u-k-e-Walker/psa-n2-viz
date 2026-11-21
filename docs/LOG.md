@@ -86,3 +86,60 @@ f = 1.028 (Buck81), not ≈ 1.005, so y_H₂O = 915 ppm (the question quoted ≈
   departs from the final.
 - **Gate 0 PASS:** imports work; the draft renderer (OpenGL) renders headless;
   initial commit made.
+
+## 2026-11-20 Phase 1: two-bed model (in progress)
+
+### Code
+- `psan2viz/isotherm.py` (multi-site extended Langmuir, LDF + Darken), `bed.py` (layered grid +
+  the shared rate kernel: psa-viz's equations generalized to n components, per-cell sorbents,
+  several valves per bed end), `column.py` (psa-viz's 4-step single column on the shared kernel,
+  for G1c), `plant.py` (two beds + receiver + linear bidirectional valves as one ODE; the
+  literature cycle; CSS), `cases.py` (the N2-generator case with provenance), `css.py`,
+  `analysis.py` (cycle sampling, H2O front, equalization residual, symmetry).
+- Frozen copy of psa-viz's column model in tests/psaviz_ref (origin header); nothing imports
+  ../psa-viz. The one ISODB record that came from psa-sim's data folder is copied into
+  model/data/isodb/.
+
+### Inputs (docs/INPUTS.md; model/fits)
+- Marcinek's Sips parameters reproduce the ISODB CT-350 N2 data at 293 K (1.068/1.460/1.834 vs
+  1.065/1.45/1.835 mmol/g at 5/10/20 bar), so T0 = 293.15 K and his parameters apply at 20 C.
+- Single-site Langmuir fits missed the Sips curves by up to 20 % at 6-10 bar; dual-site fits are
+  within 4.4 % (O2) and 6.0 % (N2). Alumina CO2 needs two sites too (joint 273/303 K fit, 1.5 %).
+- The CMS strong site (0.02 mol/kg, b ~20 /bar) would crowd out any species placed on it, so CO2
+  and H2O sit on the main site.
+- ISODB "CMS water 293 K, Isotherm4" exceeds the saturation pressure of water at 293 K and was not
+  used.
+- Water on alumina: type II; the dual-site fit is a strong site plus a linear term (6 % up to
+  RH 0.5). The strong-site constant is capped at b_RH = 100 (the data start at RH 0.043 and
+  cannot tell larger values apart); this cut the plant cycle time from ~45 s to ~30 s.
+
+### G1c regression (model/regression/g1c.json): PASS
+psa-viz's case run by the frozen reference and by ColumnN with five components (N2 = B, O2 = A,
+Ar/CO2/H2O zero), 62 cycles each. At rtol 1e-9: purity 9.7e-10, recovery 2.6e-9, y_A profiles
+3.4e-8, loadings 7.0e-8, P(t) 1.6e-8 (rel), receiver P 5.4e-10 (rel); max 7.0e-8 < 1e-6. At the
+case tolerance rtol 1e-6 the difference is 1.9e-5 (integrator step-selection noise; the state
+vectors differ in length, so the error norms pick different steps). Trace species stay at 1e-20.
+
+### Performance findings
+- One cycle of the 1460-state plant took ~45 s at first: per half-cycle ~9 s in finite-difference
+  Jacobians, ~8 s in 474 LU factorizations, ~7 s in the RHS. The Jacobian is dense within a bed
+  (the uniform-pressure velocity march couples every cell), so sparsity cannot help.
+- Culprit for the frequent Jacobian refreshes: the trace species, mostly water at its steep
+  alumina isotherm (production segment: 1.6 s, 6 Jacobians without CO2/H2O vs 10.7 s, 108 with).
+  Smoothing the upwind and valve-direction switches did not help and was removed. A looser
+  absolute tolerance on CO2/H2O (1e-6 of their feed level) helps a little and is used.
+- Two parallel runs that each used 20 OpenBLAS threads oversubscribed the CPU (load 37); every
+  run now pins OPENBLAS_NUM_THREADS.
+- Anderson acceleration of the half-cycle map stalled at RMS ~5e-4 (the slow modes are the CO2
+  loading of the CMS and the water front in the alumina, hundreds of half-cycles). Replaced by
+  Jacobian-free Newton-Krylov on the swapped half-cycle map (GMRES, finite-difference
+  Jacobian-vector products, backtracking line search).
+- Newton-Krylov stalled at RMS ~8e-4 (GMRES never converged within 80 products; every Newton step
+  failed its line search). Diagnosis from the Aitken solver's first runs: consecutive half-cycle
+  changes of the CO2/H2O loadings point in opposite directions (cos ~ -0.4), because the swapped
+  half-cycle map flips the sign of the bed-to-bed difference. Measured over full cycles (two
+  half-maps) the changes are monotone: decay factors ~0.98-0.99 per cycle for water, ~0.8-0.9 for
+  CO2. The CSS solver used from here on (`Plant.run_to_css_proj`): plain half-cycle maps, and every
+  fifth map a vector-Aitken jump of the CO2 and H2O loadings by the rest of their geometric series,
+  lam/(1-lam) d2 (cosine >= 0.95, lam in (0, 1), at most 3000 cycles). The gates verify the result
+  with plain full cycles, so the acceleration cannot bias it.

@@ -34,7 +34,7 @@ from scipy.optimize import least_squares
 
 HERE = Path(__file__).resolve().parent
 DATA = HERE.parent / "data" / "isodb"
-LOCAL_ISODB = Path("/home/lukew/projects/psa/data/isodb/records")  # psa-sim's committed ISODB copy (read only)
+LOCAL_ISODB = DATA  # this record was copied from psa-sim data/isodb/records so the repo stands alone
 R = 8.314462618
 T = 293.15
 SP = ("N2", "O2", "Ar", "CO2", "H2O")

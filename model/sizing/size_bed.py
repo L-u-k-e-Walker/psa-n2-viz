@@ -56,8 +56,10 @@ for it in range(1, a.max_iter + 1):
     pl = Plant(case)
     log(f"iter {it}: {json.dumps(params)}")
     t0 = time.time()
-    x, hist = pl.run_to_css(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=2e-7, m=a.m,
-                            progress=lambda h: log(f"    {h['iter']:3d} rms {h['rms']:.2e} {h['wall_s']:.0f}s"))
+    x, hist = pl.run_to_css_proj(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=2e-7,
+                                 plain=0 if x0 is not None else 12,
+                                 progress=lambda h: log(f"    {h['kind']} {h['iter']:3d} rms {h['rms']:.2e} maps {h['maps']} "
+                                                        f"{h['wall_s']:.0f}s {h.get('note', '')}"))
     x_end, recs = pl.run_cycle(x)
     met = pl.cycle_metrics(recs)
     rms, mx = pl.norm_change(x_end, x)

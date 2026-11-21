@@ -43,9 +43,16 @@ class Cycle:
         flows, beds, C, PT, yT, _ = pl._valve_flows(X, seg)
         out = dict(t=float(t), frac=float(t / self.T), seg=s, seg_name=seg.name, t_in_seg=float(t - self.starts[s]),
                    seg_frac=float((t - self.starts[s]) / self.dur[s]), p_tank=float(PT[0]), y_tank=yT[:, 0].copy())
+        zero = (np.zeros(1), np.zeros((pl.n, 1)))
         for k in (0, 1):
             c, q = beds[k]
             Ck = C[k][:, 0]
+            bot = [flows[(k, v)] for v in VALVES_BOTTOM if (k, v) in flows]
+            top = [flows[(k, v)] for v in VALVES_TOP if (k, v) in flows]
+            ends = [("valves", sum(f_[0] for f_ in e) if e else zero[0], sum(f_[1] for f_ in e) if e else zero[1])
+                    for e in (bot, top)]
+            _, _, u, _, _ = pl.g.rates(c, q, C[k], ends[0], ends[1])
+            out[f"u{k}"] = u[:, 0].copy()  # superficial face velocities, m/s (+ = up), the solver's own
             out[f"y{k}"] = (c[:, :, 0] / Ck)  # (n, N)
             out[f"q{k}"] = q[:, :, 0].copy()
             out[f"C{k}"] = Ck.copy()
