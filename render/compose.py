@@ -1178,32 +1178,38 @@ class Composer:
         self._axis_style(a)
         self.text(fig, bo[0], y0 - 30, "O$_2$ in gas", size=10, color=T["ink2"])
         self.text(fig, bo[0] + 8, y1 + 22, "O$_2$ %", size=10, color=T["muted"])
-        # sorbent loading, % of the local feed-equilibrium loading
+        # sorbent loading, % of each sorbent's own equilibrium loading with feed air. The two sorbents get
+        # separate axes with a gap: loading belongs to the solid, so it jumps where the material changes
+        # (the gas profile beside it stays continuous)
         q = fr[f"q{k}"]
         rel = 100 * q / self.q_ref
         al = ~self.cms_cells
-        a = self.box_axes(fig, bl)
-        # O2 and N2 over the CMS; water over the alumina layer (each sorbent's own feed equilibrium; the lines
-        # are not joined across the layer boundary, where the sorbent changes)
         cm = self.cms_cells
+        yb = y1 - self.z_al * (y1 - y0)  # layer boundary (px)
+        gap = 7.0
+        a = self.box_axes(fig, (bl[0], y0, bl[2], yb - gap / 2))
         zc = self.z[cm]
         a.fill_betweenx(zc, 0, rel[IN2][cm], color=T["N2"], alpha=0.16, lw=0)
         a.plot(rel[IN2][cm], zc, color=T["N2"], lw=2.0 * self.s)
         a.fill_betweenx(zc, 0, rel[IO2][cm], color=T["O2"], alpha=0.22, lw=0)
         a.plot(rel[IO2][cm], zc, color=T["O2"], lw=2.4 * self.s)
-        za = np.concatenate([[0.0], self.z[al], [self.z_al]])
-        wa = np.concatenate([[rel[IH2O][al][0]], rel[IH2O][al], [rel[IH2O][al][-1]]])
-        a.fill_betweenx(za, 0, wa, color=T["H2O"], alpha=0.30, lw=0)
-        a.plot(wa, za, color=T["H2O"], lw=2.0 * self.s)
-        for i, lw_ in ((IO2, 2.4), (IN2, 1.6)):  # O2 and N2 on the alumina (its own feed equilibrium); N2 on top, thinner
-            va_ = np.concatenate([[rel[i][al][0]], rel[i][al], [rel[i][al][-1]]])
-            a.plot(va_, za, color=T[SPECIES[i]], lw=lw_ * self.s)
-        a.axhline(self.z_al, color=T["axis"], lw=1.0 * self.s)
-        a.text(3, 0.5 * self.z_al, "alumina", ha="left", va="center", fontsize=self.fs(8), color=T["ink2"])
-        a.set(xlim=(0, 105), ylim=(0, 1), xticks=[0, 50, 100], yticks=[])
+        a.set(xlim=(0, 105), ylim=(self.z_al, 1), xticks=[0, 50, 100], yticks=[])
+        a.tick_params(labelbottom=False)
         self._axis_style(a)
+        a.text(1.04, 0.5, "CMS", transform=a.transAxes, rotation=90, ha="left", va="center", fontsize=self.fs(8.5), color=T["ink2"])
+        b = self.box_axes(fig, (bl[0], yb + gap / 2, bl[2], y1))
+        b.set_facecolor(T["highlight"])
+        za = np.concatenate([[0.0], self.z[al], [self.z_al]])
+        ext = lambda v: np.concatenate([[v[al][0]], v[al], [v[al][-1]]])  # noqa: E731
+        b.fill_betweenx(za, 0, ext(rel[IH2O]), color=T["H2O"], alpha=0.30, lw=0)
+        b.plot(ext(rel[IH2O]), za, color=T["H2O"], lw=2.0 * self.s)
+        b.plot(ext(rel[IO2]), za, color=T["O2"], lw=2.2 * self.s)
+        b.plot(ext(rel[IN2]), za, color=T["N2"], lw=1.6 * self.s)
+        b.set(xlim=(0, 105), ylim=(0, self.z_al), xticks=[0, 50, 100], yticks=[])
+        self._axis_style(b)
+        b.text(1.04, 0.5, "alumina", transform=b.transAxes, rotation=90, ha="left", va="center", fontsize=self.fs(7.5), color=T["ink2"])
         self.text(fig, bl[0] + 4, y0 - 30, "loading", size=10, color=T["ink2"])
-        self.text(fig, bl[0], y1 + 22, "% of feed eq.", size=10, color=T["muted"])
+        self.text(fig, bl[0], y1 + 22, "% of equilibrium\nwith feed air", size=9.5, color=T["muted"], linespacing=1.15)
         for j, (i, lab) in enumerate(((IO2, "O$_2$"), (IN2, "N$_2$"), (IH2O, "H$_2$O"))):
             xx = bl[0] + j * 30
             fig.lines.append(plt.Line2D([self.fx(xx + 4)], [self.fy(y0 - 6)], marker="o", ms=5 * self.s, color=T[SPECIES[i]],
@@ -1252,8 +1258,7 @@ class Composer:
         x0, y0, x1, y1 = self.L["timing"]
         a = self.box_axes(fig, (x0 + 92, y0 + 44, x1 - 22, y1))
         self.text(fig, x0, y0, "Steps and valves", size=13, fontweight="bold")
-        self.text(fig, x0, y0 + 21, "bars: valve open (upper bed 1, lower bed 2); hatched: product back-flow",
-                  size=10, color=T["muted"])
+        self.text(fig, x0, y0 + 21, "bars: valve open (upper bed 1, lower bed 2)", size=10, color=T["muted"])
         rows = [("bed 1", None), ("bed 2", None), ("feed", "feed"), ("product", "product"), ("purge", "purge"),
                 ("vent", "vent"), ("equalize", "eq_top")]
         nrow = len(rows)
@@ -1290,8 +1295,17 @@ class Composer:
                         if xb < xa:
                             xb = 1.0
                         a.add_patch(Rectangle((xa, yy - 0.12), xb - xa, 0.24, fc=T["ink2"] if k == 0 else T["muted"], lw=0))
+        # label the hatched (green) windows directly: pressurization with product back-flow
+        tips = [(0.5 * (w0 + w1), nrow - 1 - k + 0.38) for k in (0, 1) for w0, w1 in self._backflow[k]]
+        if tips:
+            tx, ty = 0.30, nrow - 0.02
+            for (xt, yt) in tips:
+                a.annotate("", xy=(xt, yt), xytext=(tx - 0.005, ty), annotation_clip=False,
+                           arrowprops=dict(arrowstyle="-", color=T["N2"], lw=1.0 * self.s, shrinkA=0, shrinkB=1))
+            a.text(tx, ty, "product back-flow (pressurization)", ha="left", va="center", fontsize=self.fs(9.5),
+                   color=T["N2"], clip_on=False)
         a.axvline(fr["frac"], color=T["ink"], lw=1.8 * self.s)
-        a.set(xlim=(0, 1), ylim=(-0.6, nrow - 0.4), xticks=[0, 0.25, 0.5, 0.75, 1.0], yticks=[])
+        a.set(xlim=(0, 1), ylim=(-0.6, nrow + 0.25), xticks=[0, 0.25, 0.5, 0.75, 1.0], yticks=[])
         a.set_xlabel("t / t$_{cycle}$", fontsize=self.fs(11), labelpad=2)
         a.grid(False)
         a.spines["left"].set_visible(False)
