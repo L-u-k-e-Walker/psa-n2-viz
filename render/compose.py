@@ -1195,9 +1195,11 @@ class Composer:
         wa = np.concatenate([[rel[IH2O][al][0]], rel[IH2O][al], [rel[IH2O][al][-1]]])
         a.fill_betweenx(za, 0, wa, color=T["H2O"], alpha=0.30, lw=0)
         a.plot(wa, za, color=T["H2O"], lw=2.0 * self.s)
+        for i, lw_ in ((IO2, 2.4), (IN2, 1.6)):  # O2 and N2 on the alumina (its own feed equilibrium); N2 on top, thinner
+            va_ = np.concatenate([[rel[i][al][0]], rel[i][al], [rel[i][al][-1]]])
+            a.plot(va_, za, color=T[SPECIES[i]], lw=lw_ * self.s)
         a.axhline(self.z_al, color=T["axis"], lw=1.0 * self.s)
-        a.text(103, 0.5 * self.z_al, "H$_2$O\non alumina", ha="right", va="center", fontsize=self.fs(8),
-               color=T["ink2"], linespacing=1.0)
+        a.text(3, 0.5 * self.z_al, "alumina", ha="left", va="center", fontsize=self.fs(8), color=T["ink2"])
         a.set(xlim=(0, 105), ylim=(0, 1), xticks=[0, 50, 100], yticks=[])
         self._axis_style(a)
         self.text(fig, bl[0] + 4, y0 - 30, "loading", size=10, color=T["ink2"])
