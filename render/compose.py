@@ -60,6 +60,16 @@ LAYOUTS = {
         train_x=20, train="compact", receiver=(1150, 96, 1204, 214), silencer_x=1130,
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1072)),
+    "E": dict(  # twin towers, two 3-way valves per end (user, v06 review); a profile chart beside each bed
+        name="twin towers, 3-way valves", pid="threeway", title=(36, 24), legend=(1330, 866),
+        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_all", label_side=["left", "right"],
+        prof_boxes=[(380, 344, 600, 744), (720, 344, 940, 744)],
+        v3_top_y=294, purge_y=236, recv_line_y=150, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
+        tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
+        train_x=20, train="compact", receiver=(1196, 92, 1246, 200), silencer_x=1130,
+        gauges=[(150, 212), (1144, 212)], gauge_r=30,
+        timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
+        readouts=(1330, 696), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -470,7 +480,195 @@ class Composer:
         self._regulator(ax, g["rcx"], ry1 + 30, vertical=True)
         self.text(fig, g["rcx"] + 34, ry1 + 16, "N$_2$ product\n30 SLPM, 6 barg", size=10.5, linespacing=1.25)
 
+    def _net_threeway(self):
+        """Two 3-way valves per end. Bottom: bed <-> feed line | exhaust; one feed-inlet valve on the feed tee.
+        Top: bed <-> product line | purge line; an outlet valve on the riser to the receiver, a needle valve on
+        the purge supply. The model's equalization valves are drawn as the path through both 3-way valves
+        with the inlet (bottom) / outlet (top) valve shut. Segment flows are the model's valve flows."""
+        key = ("threeway", None if self.nozzles is None else tuple(map(tuple, self.nozzles)))
+        if getattr(self, "_net_key", "unset") == key:
+            return self._net_obj, self._geo
+        L, T = self.L, self.T
+        beds = [self.bed_geometry(k) for k in (0, 1)]
+        cx = [0.5 * (b[0] + b[2]) for b in beds]
+        if self.nozzles is not None:
+            y_tops = [nz[0] for nz in self.nozzles]
+            y_bots = [nz[1] for nz in self.nozzles]
+        else:
+            y_tops = [b[1] - 14 for b in beds]
+            y_bots = [b[3] + 14 for b in beds]
+        vt, pu, rl = L["v3_top_y"], L["purge_y"], L["recv_line_y"]
+        vb, ve, fo, vo = L["v3_bot_y"], L["vent_y"], L["feed_out_y"], L["vent_out_y"]
+        txf, txv, txp, txq = L["tee_feed_x"], L["tee_vent_x"], L["tee_prod_x"], L["tee_purge_x"]
+        rx0, ry0, rx1, ry1 = L["receiver"]
+        rcx = 0.5 * (rx0 + rx1)
+        sx, tx = L["silencer_x"], L["train_x"]
+        x_in = tx + 170
+        yf = self.cyc.pl.yf
+        mcfg = self.cfg.get("molecules", {}).get("weights", {})
+        w = [mcfg.get(sp, 1.0) for sp in SPECIES]
+        pcfg = self.cfg.get("pipes", {})
+        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 16.0),
+                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05))
+        bot = lambda fr, k: fr[f"y{k}"][:, 0]  # noqa: E731
+        top = lambda fr, k: fr[f"y{k}"][:, -1]  # noqa: E731
+        tank = lambda fr: fr["y_tank"]  # noqa: E731
+
+        def pos(x):
+            return np.maximum(x, 0.0)
+
+        # lines first, risers that cross them later (with a halo)
+        net.add("exh_l", [(cx[0], vb), (cx[0], ve), (txv, ve)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0))
+        net.add("exh_r", [(cx[1], vb), (cx[1], ve), (txv, ve)], lambda d: -d["F1_vent"], lambda fr, F: bot(fr, 1))
+        net.add("purge_l", [(txq, pu), (cx[0], pu), (cx[0], vt)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("purge_r", [(txq, pu), (cx[1], pu), (cx[1], vt)], lambda d: d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        for k in (0, 1):
+            o = 1 - k
+            net.add(f"bed_bot{k}", [(cx[k], y_bots[k]), (cx[k], vb)],
+                    lambda d, k=k: -(d[f"F{k}_feed"] + d[f"F{k}_vent"] + d[f"F{k}_eq_bot"]),
+                    lambda fr, F, k=k, o=o: bot(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))], bot(fr, k)))
+            net.add(f"bed_top{k}", [(cx[k], y_tops[k]), (cx[k], vt)],
+                    lambda d, k=k: -(d[f"F{k}_product"] + d[f"F{k}_purge"] + d[f"F{k}_eq_top"]),
+                    lambda fr, F, k=k, o=o: top(fr, k) if F > 0 else _mix([(pos(fr[f"F{k}_product"]) + pos(fr[f"F{k}_purge"]), tank(fr)),
+                                                                          (pos(fr[f"F{k}_eq_top"]), top(fr, o))], top(fr, k)))
+        # feed / bottom-equalization line: halves carry bed k's feed + equalization flow (+ = towards bed 2)
+        net.add("feed_l", [(cx[0], vb), (txf, vb)], lambda d: -(d["F0_feed"] + d["F0_eq_bot"]),
+                lambda fr, F: bot(fr, 0) if F > 0 else _mix([(pos(fr["F0_feed"]), yf), (pos(fr["F0_eq_bot"]), bot(fr, 1))], yf))
+        net.add("feed_r", [(txf, vb), (cx[1], vb)], lambda d: d["F1_feed"] + d["F1_eq_bot"],
+                lambda fr, F: _mix([(pos(fr["F1_feed"]), yf), (pos(fr["F1_eq_bot"]), bot(fr, 0))], yf) if F > 0 else bot(fr, 1))
+        # product / top-equalization line
+        net.add("prod_l", [(cx[0], vt), (txp, vt)], lambda d: -(d["F0_product"] + d["F0_eq_top"]),
+                lambda fr, F: top(fr, 0) if F > 0 else _mix([(pos(fr["F0_product"]), tank(fr)), (pos(fr["F0_eq_top"]), top(fr, 1))], tank(fr)))
+        net.add("prod_r", [(txp, vt), (cx[1], vt)], lambda d: d["F1_product"] + d["F1_eq_top"],
+                lambda fr, F: _mix([(pos(fr["F1_product"]), tank(fr)), (pos(fr["F1_eq_top"]), top(fr, 0))], tank(fr)) if F > 0 else top(fr, 1))
+        prod_mix = lambda fr, F: (_mix([(pos(-fr["F0_product"]), top(fr, 0)), (pos(-fr["F1_product"]), top(fr, 1))], tank(fr))  # noqa: E731
+                                  if F > 0 else tank(fr))
+        net.add("prod_up", [(txp, vt), (txp, rl), (txq, rl)], lambda d: -(d["F0_product"] + d["F1_product"]), prod_mix, halo=True)
+        net.add("recv_in", [(txq, rl), (rx0, rl)], lambda d: -(d["F0_product"] + d["F1_product"]) - (d["F0_purge"] + d["F1_purge"]),
+                lambda fr, F: prod_mix(fr, 1.0) if F > 0 else tank(fr))
+        net.add("purge_down", [(txq, rl), (txq, pu)], lambda d: d["F0_purge"] + d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 70)], lambda d: d["F_product_out"], lambda fr, F: tank(fr))
+        net.add("feed_in", [(x_in, fo), (txf, fo), (txf, vb)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf, halo=True)
+        net.add("vent_out", [(txv, ve), (txv, vo), (sx, vo)], lambda d: -(d["F0_vent"] + d["F1_vent"]),
+                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))], bot(fr, 0)) if F > 0 else bot(fr, 0))
+        for i, pts in enumerate([[(tx + 48, fo), (tx + 64, fo)], [(tx + 90, fo), (tx + 100, fo)], [(tx + 152, fo), (x_in, fo)]]):
+            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None)
+        # gauge stems: from the bed's top line to the dial (no gas drawn)
+        for k, (gx, gy) in enumerate(L["gauges"]):
+            ys = y_tops[k] - 12
+            side = 1 if k == 0 else -1
+            xr = gx + side * (L["gauge_r"] + 20)
+            net.add(f"gauge_stem{k}", [(cx[k], ys), (xr, ys), (xr, gy), (gx + side * L["gauge_r"], gy)],
+                    lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, tube_w=7.0)
+        net.finish()
+        geo = dict(cx=cx, vt=vt, pu=pu, rl=rl, vb=vb, ve=ve, fo=fo, vo=vo, tx=tx, sx=sx, rcx=rcx, txf=txf, txp=txp, txq=txq,
+                   receiver=(rx0, ry0, rx1, ry1), y_tops=y_tops)
+        self._net_key, self._net_obj, self._geo = key, net, geo
+        return net, geo
+
+    def _valve3(self, ax, x, y, dirs, open_ports, size=14):
+        """3-way valve: one triangle per port (apex at the centre), filled where the path is open.
+        dirs: port directions ('u', 'd', 'l', 'r'); open_ports: set of open ones (the common port fills
+        whenever any other port is open)."""
+        T = self.T
+        s = size
+        vec = {"u": (0, -1), "d": (0, 1), "l": (-1, 0), "r": (1, 0)}
+        for p in dirs:
+            ux, uy = vec[p]
+            px, py = -uy, ux
+            tri = [(x, y), (x + ux * s + px * s * 0.78, y + uy * s + py * s * 0.78), (x + ux * s - px * s * 0.78, y + uy * s - py * s * 0.78)]
+            on = p in open_ports
+            ax.add_patch(Polygon(tri, closed=True, fc=T["ink"] if on else T["bg"], ec=T["ink"] if on else T["muted"],
+                                 lw=1.6 * self.s, zorder=6))
+        ax.add_patch(plt.Circle((x, y), 2.6, fc=T["ink"], ec="none", zorder=7))
+
+    def _gauge(self, fig, ax, k, fr):
+        """Live O2 analyzer dial on bed k's top outlet: log scale 10 ppm .. 25 %, spec band <= 0.5 %."""
+        T = self.T
+        gx, gy = self.L["gauges"][k]
+        r = self.L["gauge_r"]
+        y_o2 = float(fr[f"y{k}"][IO2, -1])
+        lo, hi = math.log10(1e-5), math.log10(0.25)
+        a0, a1 = 225.0, -45.0  # degrees, low at lower left, high at lower right
+
+        def ang(v):
+            f = (math.log10(min(max(v, 1e-5), 0.25)) - lo) / (hi - lo)
+            return math.radians(a0 + (a1 - a0) * f)
+
+        ax.add_patch(plt.Circle((gx, gy), r, fc=T["bg"], ec=T["metal"], lw=2.2 * self.s, zorder=8))
+        # spec band: up to 0.5 % O2 in the N2 colour
+        th = np.linspace(ang(1e-5), ang(5e-3), 40)
+        ax.plot(gx + 0.80 * r * np.cos(th), gy - 0.80 * r * np.sin(th), color=T["N2"], lw=3.2 * self.s, zorder=9,
+                solid_capstyle="butt")
+        th = np.linspace(ang(5e-3), ang(0.25), 40)
+        ax.plot(gx + 0.80 * r * np.cos(th), gy - 0.80 * r * np.sin(th), color=T["O2"], lw=3.2 * self.s, zorder=9,
+                solid_capstyle="butt", alpha=0.55)
+        for v in (1e-4, 1e-3, 1e-2, 1e-1):
+            t = ang(v)
+            ax.plot([gx + 0.62 * r * math.cos(t), gx + 0.92 * r * math.cos(t)],
+                    [gy - 0.62 * r * math.sin(t), gy - 0.92 * r * math.sin(t)], color=T["ink2"], lw=1.0 * self.s, zorder=9)
+        t = ang(y_o2)
+        ax.plot([gx, gx + 0.78 * r * math.cos(t)], [gy, gy - 0.78 * r * math.sin(t)], color=T["ink"], lw=2.0 * self.s,
+                zorder=10, solid_capstyle="round")
+        ax.add_patch(plt.Circle((gx, gy), 3.2, fc=T["ink"], ec="none", zorder=11))
+        val = f"{1e6 * y_o2:,.0f} ppm" if y_o2 < 0.01 else f"{100 * y_o2:.1f} %"
+        self.text(fig, gx, gy + r + 5, "O$_2$ out", size=9.5, ha="center", color=T["muted"])
+        self.text(fig, gx, gy + r + 19, val, size=12, ha="center", fontweight="bold")
+
+    def _pid_threeway(self, fig, fr):
+        T = self.T
+        ax = fig.add_axes([0, 0, 1, 1], zorder=0)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        net, g = self._net_threeway()
+        net.draw_tubes(ax)
+        net.draw_gas(ax, fr, [T[sp] for sp in SPECIES])
+        net.draw_chevrons(ax, fr)
+        cx = g["cx"]
+        eqb, eqt = bool(fr["open0_eq_bot"]), bool(fr["open0_eq_top"])
+        for k in (0, 1):
+            inward = "r" if k == 0 else "l"
+            ob = set()
+            if fr[f"open{k}_feed"] or eqb:
+                ob |= {"u", inward}
+            if fr[f"open{k}_vent"]:
+                ob |= {"u", "d"}
+            self._valve3(ax, cx[k], g["vb"], ("u", "d", inward), ob)
+            ot = set()
+            if fr[f"open{k}_product"] or eqt:
+                ot |= {"d", inward}
+            if fr[f"open{k}_purge"]:
+                ot |= {"d", "u"}
+            self._valve3(ax, cx[k], g["vt"], ("u", "d", inward), ot)
+        feed_open = bool(fr["open0_feed"]) or bool(fr["open1_feed"])
+        prod_open = bool(fr["open0_product"]) or bool(fr["open1_product"])
+        self._valve(ax, g["txf"], 0.5 * (g["vb"] + g["ve"]) + 6, feed_open)
+        self._valve(ax, g["txp"], 0.5 * (g["vt"] + g["pu"]), prod_open)
+        self._valve(ax, g["txq"], 0.5 * (g["rl"] + g["pu"]), True, size=11, needle=True)
+        for x, y, lab, ha in ((cx[0] + 22, g["vt"] - 12, "product · top equalization", "left"),
+                              (cx[0] + 22, g["pu"] - 12, "purge", "left"),
+                              (cx[0] + 22, g["vb"] - 12, "feed · bottom equalization", "left"),
+                              (cx[0] + 22, g["ve"] - 12, "exhaust", "left")):
+            self.text(fig, x, y, lab, size=10, color=T["muted"], va="bottom", ha=ha)
+        tx, fo, vo = g["tx"], g["fo"], g["vo"]
+        self._compressor(ax, tx + 24, fo)
+        self._vessel(ax, tx + 77, fo - 45, 26, 70, None)
+        self._box_icon(ax, tx + 100, fo - 20, 52, 40, "dryer", small=True)
+        self.text(fig, tx, fo + 34, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
+                  size=10, color=T["muted"])
+        self._box_icon(ax, g["sx"], vo - 15, 56, 30, "silencer", small=True)
+        self.text(fig, g["sx"] + 64, vo - 9, "vent", size=11, color=T["muted"])
+        rx0, ry0, rx1, ry1 = g["receiver"]
+        self._vessel(ax, g["rcx"], ry0, rx1 - rx0, ry1 - ry0, "N$_2$ receiver")
+        self._regulator(ax, g["rcx"], ry1 + 30, vertical=True)
+        self.text(fig, g["rcx"] + 16, ry1 + 40, "N$_2$ product\n30 SLPM\n6 barg", size=10.5, linespacing=1.2)
+        for k in (0, 1):
+            self._gauge(fig, ax, k, fr)
+
     def _pid(self, fig, fr):
+        if self.L.get("pid") == "threeway":
+            return self._pid_threeway(fig, fr)
         if self.L.get("pid") == "manifold":
             return self._pid_manifold(fig, fr)
         T, L = self.T, self.L

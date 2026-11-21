@@ -21,7 +21,7 @@ Main sources: Marcinek's dissertation on a CarboTech twin-bed pilot with Shirasa
 (isotherms, kinetics, cycle) and NIST ISODB isotherm records (CO₂ on CT-350, water and CO₂ on
 activated alumina).
 
-Not simulated, drawn as context: the compressor, air receiver and dryer. Not to scale: the 3D bed
+Not simulated, drawn as context: the compressor, air receiver and dryer. The valve arrangement is a drawing of the model's valves (feed, vent, product and purge per bed, one equalization valve per end): it is drawn as two 3-way valves per end plus a feed-inlet valve, a product-outlet valve and the purge needle valve; the model's equalization valves appear as the path through both 3-way valves with the inlet (bottom) or outlet (top) valve shut. Every flow drawn is the model's valve flow. Not to scale: the 3D bed
 geometry and particle size, molecule size and speed, and the trace-species molecule counts.
 
 ## Pipeline

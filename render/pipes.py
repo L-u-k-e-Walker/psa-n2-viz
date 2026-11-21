@@ -21,11 +21,12 @@ from matplotlib.patches import Polygon
 IN2, IO2, IAR, ICO2, IH2O = 0, 1, 2, 3, 4
 
 
-def _mix(parts):
-    """Flow-weighted mix of (flow >= 0, y (n,)) parts; None if nothing flows."""
+def _mix(parts, fallback=None):
+    """Flow-weighted mix of (flow >= 0, y (n,)) parts; ``fallback`` (the gas standing in the line) if
+    nothing flows."""
     tot = sum(f for f, _ in parts)
     if tot <= 0:
-        return None
+        return fallback
     return sum(f * y for f, y in parts) / tot
 
 

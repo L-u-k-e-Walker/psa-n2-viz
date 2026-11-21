@@ -10,7 +10,7 @@ literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, 
 molecule speed and trace-species counts."""
 
 [layout]
-option = "D"            # A | B | C | D; D = conventional twin towers (user, v05 review)
+option = "E"            # A..E; E = twin towers with two 3-way valves per end (user, v06 review)
 pressure_unit = "barg"  # barg | bara
 
 [timing]
@@ -27,14 +27,14 @@ sheet_cols = 2
 [tiers.draft]
 size = [960, 540]
 fps = 15                 # every second frame of the 30 fps timeline
-theme = "dark"
+theme = "white"          # white only (user, v06 review)
 renderer = "auto"        # auto (faster of opengl / tachyon without AO, timed on the scene) | opengl | tachyon_fast
 sheet_frames = 8
 
 [tiers.final]
 size = [1920, 1080]
 fps = 30
-themes = ["dark", "white"]
+themes = ["white"]       # white only (user, v06 review)
 gif_fps = 15
 gif_max_mb = 50
 ao_samples = 12

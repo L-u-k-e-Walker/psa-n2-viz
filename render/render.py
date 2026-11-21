@@ -327,7 +327,7 @@ def main():
     g.add_argument("--draft", action="store_true")
     g.add_argument("--final", metavar="vNN")
     ap.add_argument("--layout", default=None)
-    ap.add_argument("--theme", default="dark")
+    ap.add_argument("--theme", default="white")
     ap.add_argument("--css", default=str(CSS_DIR))
     ap.add_argument("--version", default=None)
     ap.add_argument("--config", default=str(HERE / "config.toml"))
