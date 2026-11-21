@@ -297,3 +297,14 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   the packed volume); secant over all points of the grid (`--prior` passes earlier rounds), stepping from
   the purge-on-target point nearest the target. 180-cell slope from rounds 0 and a: -6.47 /m (60 cells:
   -3.49; sharper fronts). Round runs_n180b: 0.8705 m, cv_purge 3.73e-4.
+- Round runs_n180b, iteration 1 (0.8705 m, cv_purge 3.73e-4): O2 5,894 ppm, purge 0.1393 vs target 0.1404
+  (-0.8 %), air factor 2.92, recovery 43.1 %, CMS water 0.56 %; CSS solve at its 40-map cap (rms 1.5e-4,
+  bulk settled). Secant -7.86 /m -> iteration 2 at 0.9048 m.
+- Accelerated trace march (`TraceMarch.march_accel`): on the frozen bulk the slow mode decays geometrically,
+  so after 10 relaxation cycles, three more give d1..d3 and z jumps by the rest of the series (aligned
+  changes, consistent decay factors, max normalized move 0.1). Test at 60 cells from the sized iteration-2
+  state: 1,508 trace cycles + 5,814 jumped reached a per-cycle change of 3.5e-7 (the plain march needed
+  ~3,000 cycles to go from 2.3e-5 to 4.4e-6), ending 1.6e-3 rms from the converged trace60 state (start:
+  4.1e-2). Near the noise floor the decay estimates scatter around 1.000 and many jumps are rejected,
+  so the gain is ~3-4x. The end criterion is unchanged (plain-cycle change) and the final state is verified
+  by full-model cycles. Used for the 180-cell final (`trace_css.py --accel`).

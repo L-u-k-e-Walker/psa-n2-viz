@@ -59,7 +59,7 @@ if not (final / "metrics.json").exists():
         time.sleep(60)
         src, rec = find_sized()
     log(f"sized 180-cell state {src}: {rec['params']}, O2 {rec['O2_ppm']:.0f} ppm")
-    run(PY + [HERE / "css" / "trace_css.py", src, final, "--tol", "1e-6", "--rtol", "1e-7", "--march-max", "3000"],
+    run(PY + [HERE / "css" / "trace_css.py", src, final, "--tol", "1e-6", "--rtol", "1e-7", "--march-max", "3000", "--accel"],
         HERE / "css")
 met = json.loads((final / "metrics.json").read_text())
 log(f"final state: O2 {met['product_O2_ppm']:.0f} ppm, CSS change rms {met['css_change_rms']:.2e}, converged {met['converged']}")

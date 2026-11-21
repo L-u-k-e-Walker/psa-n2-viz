@@ -35,6 +35,7 @@ ap.add_argument("--march-max", type=int, default=3000)
 ap.add_argument("--march-tol", type=float, default=None)
 ap.add_argument("--full", type=int, default=3)
 ap.add_argument("--outer-max", type=int, default=12)
+ap.add_argument("--accel", action="store_true", help="single-mode jumps inside the trace marches (TraceMarch.march_accel)")
 a = ap.parse_args()
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
@@ -66,7 +67,7 @@ def prog(h):
 
 
 x, hist = converge(pl, x0, tol=a.tol, march_tol=a.march_tol, march_max=a.march_max, full_between=a.full,
-                   outer_max=a.outer_max, progress=prog, checkpoint=lambda xc: np.save(out / "checkpoint.npy", xc))
+                   outer_max=a.outer_max, accel=a.accel, progress=prog, checkpoint=lambda xc: np.save(out / "checkpoint.npy", xc))
 t_css = time.time() - t0
 x_end, recs = pl.run_cycle(x)
 rms, mx = pl.norm_change(x_end, x)

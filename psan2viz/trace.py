@@ -94,8 +94,56 @@ class TraceMarch:
         return z, k, rms
 
 
+    def march_accel(self, z0, tol=1e-7, max_cycles=5000, relax=10, cos_min=0.999, lam_rtol=0.2, max_step=0.1,
+                    progress=None):
+        """Trace cycles with single-mode jumps. On the frozen bulk the slow mode (water front creeping
+        through the alumina, CO2 along it) decays geometrically (0.9993-0.9995 per cycle at 60 cells), so
+        after ``relax`` plain cycles three more give changes d1, d2, d3; if aligned (cosines >= cos_min)
+        with consistent decay factors, z jumps by the rest of the geometric series lam/(1-lam) d3, limited so
+        no normalized variable moves by more than ``max_step``. Returns (z, cycles run, last rms, jumped
+        cycles in total)."""
+        z = z0.copy()
+        t0 = time.time()
+        k, jumped, rms = 0, 0.0, np.inf
+
+        def step(z):
+            zn = self.cycle(z)
+            return zn, (zn - z) / self.sT
+
+        while k < max_cycles:
+            for _ in range(relax):
+                z, d = step(z)
+                k += 1
+            z1, d1 = step(z)
+            z2, d2 = step(z1)
+            z3, d3 = step(z2)
+            k += 3
+            z = z3
+            rms = float(np.sqrt(np.mean(d3 * d3)))
+            note = ""
+            if rms < tol:
+                if progress:
+                    progress(dict(cycle=k, rms=rms, max=float(np.abs(d3).max()), wall_s=time.time() - t0, jumped=jumped))
+                break
+            n1, n2, n3 = (float(np.linalg.norm(v)) for v in (d1, d2, d3))
+            c12, c23 = float(d1 @ d2) / (n1 * n2), float(d2 @ d3) / (n2 * n3)
+            l12, l23 = float(d2 @ d1) / (n1 * n1), float(d3 @ d2) / (n2 * n2)
+            if (min(c12, c23) >= cos_min and 0.0 < l12 < 1.0 and 0.0 < l23 < 1.0
+                    and abs(l23 - l12) <= lam_rtol * (1.0 - l23)):
+                m = min(l23 / (1.0 - l23), max_step / float(np.abs(d3).max()))
+                z = np.maximum(z3 + m * d3 * self.sT, 0.0)
+                jumped += m
+                note = f"jump {m:.0f} (lam {l23:.5f})"
+            else:
+                note = f"no jump (cos {c12:.4f}/{c23:.4f}, lam {l12:.5f}/{l23:.5f})"
+            if progress:
+                progress(dict(cycle=k, rms=rms, max=float(np.abs(d3).max()), wall_s=time.time() - t0, jumped=jumped,
+                              note=note))
+        return z, k, rms, jumped
+
+
 def converge(plant, x0, tol=1e-6, march_tol=None, march_max=3000, full_between=3, outer_max=12,
-             rtol_trace=None, progress=None, checkpoint=None):
+             rtol_trace=None, accel=False, progress=None, checkpoint=None):
     """Alternate (a) ``full_between`` full-model cycles (bulk follows the trace state) and (b) a
     frozen-bulk trace march on the last recorded cycle, until a full-model cycle changes the whole
     normalized state by less than ``tol`` (RMS). Returns (x, history)."""
@@ -120,9 +168,18 @@ def converge(plant, x0, tol=1e-6, march_tol=None, march_max=3000, full_between=3
             return x, hist
         tm = TraceMarch(pl, recs, rtol=rtol_trace)
         tm_start = time.time()
-        z, n_cyc, rms_t = tm.march(x[tm.T], tol=march_tol, max_cycles=march_max,
-                                   progress=(lambda h: progress(dict(h, kind="trace", iter=len(hist) + 1,
-                                                                     note=f"outer {outer}")) if progress else None))
+        calls = [0]
+
+        def fwd(h, outer=outer):
+            calls[0] += 1
+            if progress and (not accel or calls[0] % 15 == 1 or h["rms"] < march_tol):
+                progress(dict(h, kind="trace", iter=len(hist) + 1,
+                              note=f"outer {outer}" + (f"; {h['jumped']:.0f} cycles jumped" if accel else "")))
+
+        if accel:
+            z, n_cyc, rms_t, jumped = tm.march_accel(x[tm.T], tol=march_tol, max_cycles=march_max, progress=fwd)
+        else:
+            z, n_cyc, rms_t = tm.march(x[tm.T], tol=march_tol, max_cycles=march_max, progress=fwd)
         x = x.copy()
         x[tm.T] = z
         hist.append(dict(iter=len(hist) + 1, kind="march", rms=rms_t, max=float("nan"), wall_s=time.time() - t0))
