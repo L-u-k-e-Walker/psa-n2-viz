@@ -1296,15 +1296,13 @@ class Composer:
                             xb = 1.0
                         a.add_patch(Rectangle((xa, yy - 0.12), xb - xa, 0.24, fc=T["ink2"] if k == 0 else T["muted"], lw=0))
         # label the hatched (green) windows directly: pressurization with product back-flow
-        tips = [(0.5 * (w0 + w1), nrow - 1 - k + 0.38) for k in (0, 1) for w0, w1 in self._backflow[k]]
-        if tips:
+        if any(self._backflow[k] for k in (0, 1)):  # a key (hatched swatch + text), no leader lines (user, v15 review)
             tx, ty = 0.30, nrow - 0.02
-            for (xt, yt) in tips:
-                a.annotate("", xy=(xt, yt), xytext=(tx - 0.005, ty), annotation_clip=False,
-                           arrowprops=dict(arrowstyle="-", color=T["N2"], lw=1.0 * self.s, shrinkA=0, shrinkB=1))
-            a.text(tx, ty, "product back-flow (pressurization)", ha="left", va="center", fontsize=self.fs(9.5),
+            a.add_patch(Rectangle((tx, ty - 0.17), 0.022, 0.34, fc="none", ec=T["N2"], hatch="////", lw=0.8 * self.s,
+                                  clip_on=False))
+            a.text(tx + 0.032, ty, "product back-flow (pressurization)", ha="left", va="center", fontsize=self.fs(9.5),
                    color=T["N2"], clip_on=False)
-        a.axvline(fr["frac"], color=T["ink"], lw=1.8 * self.s)
+        a.plot([fr["frac"]] * 2, [-0.6, nrow - 0.45], color=T["ink"], lw=1.8 * self.s)  # stops below the key
         a.set(xlim=(0, 1), ylim=(-0.6, nrow + 0.25), xticks=[0, 0.25, 0.5, 0.75, 1.0], yticks=[])
         a.set_xlabel("t / t$_{cycle}$", fontsize=self.fs(11), labelpad=2)
         a.grid(False)
