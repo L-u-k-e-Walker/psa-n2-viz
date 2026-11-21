@@ -218,3 +218,24 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   (1.15 m CMS, 13.1 cm alumina, purge on target) meets the new criterion (CMS 2.3 %, interface 3.0 %);
   iteration 1 (10.1 cm) narrowly fails it (interface 5.5 %), so the alumina stays at 13.1 cm. Restarted as
   runs_n60c from 1.04 m (secant from iteration 2 with -3.52 /m), then the chain (180 cells -> 360 cells).
+- runs_n60c (CSS tolerance 5e-5 for sizing: below that only the slow water mode is left, product O2 is
+  settled): iteration 1, 1.039 m CMS: O2 4,927 ppm, air factor 3.15, recovery 40.0 %, purge 0.165 vs target
+  0.164 mol; iteration 2, **1.064 m CMS, 13.1 cm alumina, cv_purge 4.45e-4: O2 4,503 ppm, air factor 3.18,
+  N2 recovery 39.6 %, purge 0.164 vs 0.168 mol (-2.3 %), CMS water 2.0 % of feed equilibrium, interface
+  y_H2O 2.6 % of the feed: sized** (60 cells). Secant slope -3.49 /m (the earlier estimate was -3.52).
+  The chain took it up: upsampled to 180 + 30 cells, size_bed.py at 180 cells (tolerance 5e-5).
+
+### Final trace convergence (G1b): single-mode deflation
+- Diagnosis: near the CSS the residual is ONE slow eigenmode of the full-cycle map (water front creeping
+  through the alumina with CO2 displaced along it; decay 0.9995 per cycle, ~2,000-cycle e-folding).
+  run_to_css_proj extrapolates CO2, H2O and the receiver as separate groups with separate decay factors
+  and a damping driven by the global residual, which splits that mode and crushed the water jumps to
+  2-3 cycles; a long-baseline variant (runs/bl4, baseline 4, cap 3000) settled at rms ~2e-5 after 8 steps.
+- New `Plant.run_to_css_mode` (script model/css/converge_trace.py): `relax` plain full cycles, then three
+  more give consecutive whole-state changes d1, d2, d3; if aligned (cos >= 0.995) with consistent decay
+  factors, the whole state jumps along d3 by the rest of the geometric series, capped so no variable
+  changes by more than max_step (normalized).
+- Test at 60 cells (sized iteration 1 state, rtol 1e-7, runs/mode60): cos 1.0000/1.0000, lam 0.99948/0.99954,
+  jump 251 cycles (series 2,181, capped) -> residual 1.43e-5 -> 1.25e-5 as predicted (0.9995^251 = 0.88);
+  steps right after a jump see the excited fast modes (lam > 1 or cos < 0.995) and skip. Working, but the cap
+  (0.05) limits it to ~250 cycles per jump.

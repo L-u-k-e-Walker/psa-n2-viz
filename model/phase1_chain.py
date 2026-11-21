@@ -5,7 +5,7 @@ checked against 360 + 60. Steps (logged to model/phase1_chain.log; a step whose 
 skipped, so the chain can be restarted):
   0. wait for the 60-cell sizing (model/sizing/sizing_runs_n60c.json)
   1. upsample its last iteration to 180 cells
-  2. size_bed.py at 180 cells (CSS tolerance 3e-5: product O2 and recovery are converged far below
+  2. size_bed.py at 180 cells (CSS tolerance 5e-5: product O2 and recovery are converged far below
      that; only the slow trace profiles remain), warm-started, up to 3 iterations
   3. grid/run_2n.py from the 180-cell sizing state (360 + 60 cells) for G1e
 The final 180-cell state with converged trace profiles (G1b) is made afterwards with the trace
@@ -65,10 +65,10 @@ s180 = HERE / "sizing" / "sizing_runs_n180.json"
 if not s180.exists():
     params = dict(p60, n_al=30, n_cms=180)
     run(PY + [HERE / "sizing" / "size_bed.py", "--start", json.dumps(params), "--warm", start, "--out", "runs_n180",
-              "--max-iter", "3", "--tol", "3e-5", "--slope", f"{min(slope, -1.0):.3f}"], HERE / "sizing")
+              "--max-iter", "3", "--tol", "5e-5", "--slope", f"{min(slope, -1.0):.3f}"], HERE / "sizing")
 n180 = json.loads(s180.read_text())
 src180 = HERE / "sizing" / "runs_n180" / f"iter{n180['final']['iter']:02d}"
 log(f"180-cell sizing: {n180['final']['params']}, O2 {n180['final']['O2_ppm']:.0f} ppm, state {src180}")
 if not (HERE / "grid" / "2N" / "metrics.json").exists():
-    run(PY + [HERE / "grid" / "run_2n.py", "--src", src180, "--rtol", "1e-6", "--tol", "3e-5"], HERE / "grid")
+    run(PY + [HERE / "grid" / "run_2n.py", "--src", src180, "--rtol", "1e-6", "--tol", "5e-5"], HERE / "grid")
 log("chain done (next: final 180-cell state with the trace solver, then the gates)")

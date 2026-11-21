@@ -533,6 +533,72 @@ class Plant:
                 checkpoint(x)
         return x, hist
 
+    def run_to_css_mode(self, x0, tol=1e-6, relax=6, cos_min=0.995, lam_rtol=0.25, max_step=0.05, max_cycles=2000,
+                        progress=None, checkpoint=None):
+        """CSS by deflating one slow eigenmode of the full-cycle map (final convergence of the trace profiles).
+
+        Near the CSS the remaining residual is a single slow mode: the water front creeping through the
+        alumina with CO2 displaced along it (decay 0.999-0.9995 per cycle). Splitting it into per-species
+        groups (``run_to_css_proj``) gives inconsistent jumps. Here each outer step runs ``relax`` plain
+        full cycles (fast modes, decay <= 0.9, die out), then three more giving consecutive full-cycle
+        changes d1, d2, d3 of the WHOLE state (normalized). If d1, d2, d3 are aligned (cosines >= cos_min)
+        and their decay factors lam12 = d2.d1/d1.d1, lam23 = d3.d2/d2.d2 agree ((1 - lam) within lam_rtol),
+        the state jumps along d3 by the rest of the geometric series, lam/(1 - lam) d3, limited so the
+        jump changes no variable by more than ``max_step`` (normalized; the front shape is linear only
+        over small shifts). Otherwise the cycles just continue. Converged when the RMS of the normalized
+        full-cycle change < tol. Returns (x_css, history)."""
+        P = self.n_phys
+        s = self.scale[:P]
+        hist = []
+        t0 = time.time()
+        n_cyc = [0]
+
+        def C(x):
+            n_cyc[0] += 1
+            return self.project(self.full_cycle(x))
+
+        def d(a, b):
+            return (b[:P] - a[:P]) / s
+
+        x = x0.copy()
+        while n_cyc[0] < max_cycles:
+            for _ in range(relax):
+                x = C(x)
+            seq = [x]
+            for _ in range(3):
+                seq.append(C(seq[-1]))
+            d1, d2, d3 = d(seq[0], seq[1]), d(seq[1], seq[2]), d(seq[2], seq[3])
+            rms = float(np.sqrt(np.mean(d3 * d3)))
+            mx = float(np.abs(d3).max())
+            if rms < tol:
+                hist.append(dict(iter=len(hist) + 1, kind="done", rms=rms, max=mx, cycles=n_cyc[0], wall_s=time.time() - t0))
+                if progress:
+                    progress(dict(hist[-1], note=""))
+                return seq[3], hist
+            n1, n2, n3 = (float(np.linalg.norm(v)) for v in (d1, d2, d3))
+            c12, c23 = float(d1 @ d2) / (n1 * n2), float(d2 @ d3) / (n2 * n3)
+            l12, l23 = float(d2 @ d1) / (n1 * n1), float(d3 @ d2) / (n2 * n2)
+            ok = (min(c12, c23) >= cos_min and 0.0 < l12 < 1.0 and 0.0 < l23 < 1.0
+                  and abs((1.0 - l23) - (1.0 - l12)) <= lam_rtol * (1.0 - l23))
+            x = seq[3]
+            note = f"cos {c12:.4f}/{c23:.4f} lam {l12:.5f}/{l23:.5f}"
+            if ok:
+                m = l23 / (1.0 - l23)
+                m_cap = max_step / mx if mx > 0 else m
+                m_use = min(m, m_cap)
+                xn = x.copy()
+                xn[:P] = x[:P] + m_use * d3 * s
+                x = self.project(xn)
+                note += f"; jump {m_use:.0f} cycles (series {m:.0f}, cap {m_cap:.0f})"
+            else:
+                note += "; no jump"
+            hist.append(dict(iter=len(hist) + 1, kind="mode", rms=rms, max=mx, cycles=n_cyc[0], wall_s=time.time() - t0))
+            if progress:
+                progress(dict(hist[-1], note=note))
+            if checkpoint:
+                checkpoint(x)
+        return x, hist
+
     def run_to_css_aa(self, x0=None, tol=2e-7, m=10, max_cycles=400, progress=None, checkpoint=None):
         """CSS by Anderson acceleration of the full-cycle map on the slow variables.
 
