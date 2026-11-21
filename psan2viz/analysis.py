@@ -70,21 +70,34 @@ class Cycle:
         return ts, [self.frame(t) for t in ts]
 
     # -------------------------------------------------------------- checks
-    def h2o_front(self, frames, frac=0.01):
-        """Highest z/L where y_H2O >= frac * y_H2O(feed), over the sampled frames and both beds,
-        and the largest H2O loading on the CMS relative to its feed-equilibrium value."""
+    def h2o_front(self, frames, q_frac=0.1):
+        """Where the water is held, over the sampled frames and both beds.
+
+        Returns a dict:
+          front_zL      highest z/L (top face of the cell) where the water loading exceeds q_frac of the
+                        local sorbent's feed-equilibrium loading (the loading front; must stay in the alumina)
+          cms_max_rel   largest water loading on the CMS relative to its feed-equilibrium value
+          interface_y_rel  largest gas-phase y_H2O at the alumina/CMS interface during production
+                        (feed open), relative to the feed's y_H2O
+        A fixed gas mole-fraction contour is not used: at blowdown pressure the same small water
+        partial pressure above the CMS reads as a ~8x larger mole fraction."""
         iw = self.sp.index("H2O")
         yf = self.case.y_feed[iw]
         g = self.pl.g
         cms = g.layer_of == [i for i, lay in enumerate(g.layers) if lay.name == "CMS"][0]
-        z_front, q_cms = 0.0, 0.0
+        n_al = int((~cms).sum())
+        qref = self.pl.q_scale[iw]
+        front, q_cms, y_if = 0.0, 0.0, 0.0
         for fr in frames:
             for k in (0, 1):
-                wet = np.nonzero(fr[f"y{k}"][iw] >= frac * yf)[0]
-                if wet.size:
-                    z_front = max(z_front, float(g.z_faces[wet.max() + 1] / g.length))
-                q_cms = max(q_cms, float(np.max(fr[f"q{k}"][iw, cms] / self.pl.q_scale[iw, cms])))
-        return z_front, q_cms
+                q = fr[f"q{k}"][iw]
+                held = np.nonzero(q >= q_frac * qref)[0]
+                if held.size:
+                    front = max(front, float(g.z_faces[held.max() + 1] / g.length))
+                q_cms = max(q_cms, float(np.max(q[cms] / qref[cms])))
+                if fr.get(f"open{k}_feed"):
+                    y_if = max(y_if, float(fr[f"y{k}"][iw][n_al] / yf))
+        return dict(front_zL=front, cms_max_rel=q_cms, interface_y_rel=y_if)
 
     def eq_residual(self):
         """|P_hi - P_lo| at the end of each equalization / at its start."""

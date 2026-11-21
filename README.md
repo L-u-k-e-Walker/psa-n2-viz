@@ -1,12 +1,42 @@
 # psa-n2-viz: animated two-bed PSA nitrogen generator
 
-A rendered visual of a two-bed carbon-molecular-sieve PSA unit making N₂ from
-compressed air (N₂, O₂, Ar, CO₂, H₂O): 3D packed beds, a piping and valve
-schematic and live plots, at cyclic steady state, as a seamless loop.
+A rendered visual of a two-bed carbon-molecular-sieve (CMS) PSA unit making N₂ from compressed
+air (N₂, O₂, Ar, CO₂, H₂O): two 3D packed beds, a piping and valve schematic with flows, and live
+plots, at cyclic steady state, as a seamless loop. **Work in progress**: see docs/MISSION.md (plan,
+decisions, gates), docs/LOG.md (evidence), docs/REVIEWS.md (review history).
 
-**Work in progress** (see docs/MISSION.md for the plan and gates, docs/LOG.md for
-the evidence, docs/REVIEWS.md for the review history). Every input is a literature
-value, an assumption or a calculation (docs/INPUTS.md); **nothing is measured**.
+**Nothing here is measured.** Every input is a literature value (cited), a fit to literature data,
+a calculation from those, or an assumption with its reason (docs/INPUTS.md). The motion is computed,
+not scripted: every colour, profile, count and curve comes from the solver in `psan2viz/`.
 
-Env `viz` (environment.yml). The full README (outputs, pipeline, re-render
-commands, provenance) is written in Phase 5.
+## What is simulated
+
+| Piece | Model | Code |
+|---|---|---|
+| Beds | Isothermal (20 °C), no axial pressure drop, multi-site extended Langmuir, LDF with a Darken factor on the CMS, layered bed (activated alumina at the feed end, CMS above). psa-viz's column equations generalized to five components and layers; first-order upwind on 180 CMS cells | `psan2viz/bed.py` |
+| Plant | Both beds, the product receiver and linear valves (flow = Cv ΔP, bidirectional) integrated as one ODE system; the literature cycle (dual-end equalization, feed pressurization with product back-flow, production, blowdown with simultaneous product purge) | `psan2viz/plant.py` |
+| Cyclic steady state | Swapped half-cycle map, plain maps plus vector-Aitken extrapolation of the slow groups, verified by plain full cycles | `psan2viz/plant.py` |
+
+Main sources: Marcinek's dissertation on a CarboTech twin-bed pilot with Shirasagi MSC CT-350
+(isotherms, kinetics, cycle) and NIST ISODB isotherm records (CO₂ on CT-350, water and CO₂ on
+activated alumina).
+
+Not simulated, drawn as context: the compressor, air receiver and dryer. Not to scale: the 3D bed
+geometry and particle size, molecule size and speed, and the trace-species molecule counts.
+
+## Pipeline
+
+```bash
+# env viz (numpy, scipy, matplotlib, OVITO 3.17, ffmpeg); see environment.yml
+cd model/fits && python -I fit_inputs.py          # sorbent inputs from the literature data
+cd ../regression && python -I g1c_regression.py   # gate G1c (psa-viz regression)
+cd .. && OPENBLAS_NUM_THREADS=10 python -I phase1_chain.py   # sizing, final CSS, grid check, gates
+cd ../render && python -I packing.py              # 3D bed packing (seeded)
+python -I render.py --mock                        # layout contact sheet (< 1 min)
+python -I render.py --draft                       # 960x540 draft loop + contact sheet
+python -I render.py --final vNN                   # only after "final vNN" in docs/REVIEWS.md
+```
+
+All look settings are in `render/config.toml`; each render saves the config it used next to its
+output. Physics, frame states and molecule history are cached in `render/cache/`, so look changes
+never re-run the model. Frames are resumable (`frames/`, gitignored).

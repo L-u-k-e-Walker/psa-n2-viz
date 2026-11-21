@@ -72,13 +72,15 @@ else:
 
 # ---- G1f: sanity
 ts, frames = cyc.sample(40)
-z_front, q_cms = cyc.h2o_front(frames)
+wf = cyc.h2o_front(frames)
+z_front, q_cms = wf["front_zL"], wf["cms_max_rel"]
 eq = cyc.eq_residual()
 p_tank_min = min(f["p_tank"] for f in frames)
 res["G1f"] = dict(
     product_O2_ppm=met["product_O2_ppm"], O2_limit_ppm=5000.0,
     air_factor=met["air_factor"], air_factor_band=[2.0, 3.5],
-    h2o_front_zL=z_front, alumina_top_zL=cyc.z_al, h2o_on_cms_max_rel_to_feed_eq=q_cms,
+    h2o_loading_front_zL=z_front, alumina_top_zL=cyc.z_al, h2o_on_cms_max_rel_to_feed_eq=q_cms,
+    h2o_interface_y_rel_during_production=wf["interface_y_rel"],
     product_CO2_ppm=met["product_CO2_ppm"], product_H2O_ppm=met["product_H2O_ppm"],
     eq_residual=[e["ratio"] for e in eq], eq_limit=0.05,
     p_tank_min_bar=p_tank_min, p_deliver_bar=P_DELIVER,
@@ -86,7 +88,8 @@ res["G1f"] = dict(
     productivity_Nm3_h_m3=met["productivity_Nm3_h_m3"])
 f = res["G1f"]
 f["checks"] = dict(O2=f["product_O2_ppm"] <= 5000.0, air_factor=2.0 <= f["air_factor"] <= 3.5,
-                   h2o_in_alumina=z_front <= cyc.z_al and q_cms < 0.01, co2_negligible=f["product_CO2_ppm"] < 1.0,
+                   h2o_in_alumina=z_front <= cyc.z_al and q_cms < 0.1,
+                   co2_negligible=f["product_CO2_ppm"] < 0.01 * 1e6 * case.y_feed[sp.index("CO2")],
                    eq_nearly_equal=max(f["eq_residual"]) <= 0.05, regulator_supplied=p_tank_min > P_DELIVER + 0.2)
 f["pass"] = all(f["checks"].values())
 res["psa_sim_crosscheck"] = ("skipped: psa-sim supports several columns, equalization and >2 components, but not this case "

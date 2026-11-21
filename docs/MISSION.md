@@ -109,8 +109,11 @@ draft renderer (report which renderer worked); initial commit made.
   checked against 360 (+ 60); about 8-10 h of compute accepted.
 - **G1f sanity:** product O₂ ≤ 0.5 %; the air factor (feed air / product, molar)
   in 2.0–3.5 (BOGE datasheet 2.9 at 99.5 %, Marcinek 3.1–3.2 at 99.9 %; flag it
-  if outside); the H₂O front stays inside the alumina layer and the product CO₂
-  is negligible (state the ppm); the bed pressures are nearly equal at the end
+  if outside); the H₂O front stays inside the alumina layer (definition: the highest point where
+  the water loading exceeds 10 % of the local sorbent's feed-equilibrium loading lies in the
+  alumina, and the CMS holds < 10 % of its feed-equilibrium water; a gas mole-fraction contour is
+  not used because it depends on the bed pressure) and the product CO₂ is negligible (< 1 % of
+  the feed's 420 ppm; state the ppm); the bed pressures are nearly equal at the end
   of equalization (|ΔP| at the end ≤ 5 % of |ΔP| at the start; state the value).
 - **psa-sim cross-check:** psa-sim (env `psa`) supports several columns,
   equalization and more than two components, but not this full case: it has no

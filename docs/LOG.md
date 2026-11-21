@@ -183,3 +183,25 @@ vectors differ in length, so the error norms pick different steps). Trace specie
 - Changed two assumptions, as a design choice for a PSA pretreatment layer: 14x28 mesh beads (1.2 mm)
   and macropore (molecular) diffusion control for the bidisperse alumina. Water LDF 1.52e-3 /s (23x),
   CO2 0.054, N2/O2/Ar 2.6-6.0 /s. docs/INPUTS.md states both and why.
+
+### Sizing at 60 cells (model/sizing, runs_n60 and runs_n60b)
+- Iteration 1 (0.60 m CMS, 6 cm alumina, new alumina kinetics): product O2 32,291 ppm, air factor 2.28,
+  N2 recovery 53.7 %; the alumina holds the water (4.1 -> 2.1 mol/kg bottom to top), the CMS <= 6 % of its
+  feed-equilibrium water, product H2O 2.8 ppm, CO2 1.5 ppm.
+- Water-front criterion corrected: a fixed gas mole-fraction contour (1 % of the feed) reached the bed top
+  during blowdown only because the same tiny water partial pressure reads ~8x larger at 1 bar. The front is
+  now the highest point where the water loading exceeds 10 % of the local sorbent's feed-equilibrium
+  loading (it must sit in the alumina), plus the CMS water < 10 % of its feed equilibrium; the gas fraction
+  at the alumina/CMS interface during production is reported (docs/MISSION.md G1f).
+- Iteration 2 (0.93 m CMS, 7.8 cm alumina): O2 10,150 ppm, air factor 2.78, recovery 45 %, productivity
+  115 Nm3/h per m3 CMS, product CO2 0.23 ppm, H2O 2.0 ppm; loading front at the alumina top, CMS water
+  <= 4.6 %. Secant slope d ln(O2)/dh = -3.52 /m -> ~1.16 m CMS for 4500 ppm at 60 cells (100 mm x ~1.25 m
+  columns, the shape of modular extruded-aluminium N2 generators). Sizing continues at 1.16 m / 10 cm.
+- CSS-solver evolution (all verified by plain cycles in the gates): extending the Aitken jumps to the
+  receiver and bulk loadings set up a period-two oscillation (bulk removed); measuring only after two
+  relaxation maps, adaptive damping and a 10-cycle jump cap made it smooth. At 7.8 cm alumina the
+  remaining residual is the CO2 and water profiles drifting at a constant rate (decay 0.997-1.000 per
+  cycle; bulk species converged to 1e-7-1e-6): a slow translation of the water front with CO2 displaced
+  along it. Anderson mixing of the full-cycle map on the slow groups did not speed it up. Sizing uses a
+  3e-5 target (O2 converged); the final state gets a Newton-Krylov solve on the trace subspace
+  (`Plant.run_to_css_trace_nk`, full-cycle maps, bulk held at its CSS).

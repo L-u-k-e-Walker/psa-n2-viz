@@ -39,6 +39,8 @@ ap.add_argument("--warm", default=None)
 ap.add_argument("--max-iter", type=int, default=8)
 ap.add_argument("--m", type=int, default=20)
 ap.add_argument("--tol", type=float, default=1e-5, help="CSS tolerance for the sizing iterations")
+ap.add_argument("--cos-min", type=float, default=0.9, help="alignment needed for an Aitken jump")
+ap.add_argument("--m-max", type=float, default=10.0, help="largest Aitken jump (cycles)")
 ap.add_argument("--slope", type=float, default=-6.0, help="first guess of d ln(O2) / d h_cms (1/m)")
 ap.add_argument("--out", default="runs", help="subfolder for the iteration states")
 a = ap.parse_args()
@@ -57,12 +59,14 @@ if a.warm:
     w = Path(a.warm)
     x0 = np.load(w) if w.suffix == ".npy" else np.load(w / "css_state.npz")["x_start"]
 history = []
+(HERE / a.out).mkdir(parents=True, exist_ok=True)
 for it in range(1, a.max_iter + 1):
     case = n2_generator_case(**SOLVER, **params)
     pl = Plant(case)
     log(f"iter {it}: {json.dumps(params)}")
     t0 = time.time()
-    x, hist = pl.run_to_css_proj(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=a.tol,
+    x, hist = pl.run_to_css_proj(x0=x0 if (x0 is not None and x0.size == pl.size) else None, tol=a.tol, cos_min=a.cos_min, m_max=a.m_max,
+                                 checkpoint=lambda xc: np.save(HERE / a.out / "checkpoint.npy", xc),
                                  plain=0 if x0 is not None else 12,
                                  progress=lambda h: log(f"    {h['kind']} {h['iter']:3d} rms {h['rms']:.2e} maps {h['maps']} "
                                                         f"{h['wall_s']:.0f}s {h.get('note', '')}"))
@@ -71,19 +75,21 @@ for it in range(1, a.max_iter + 1):
     rms, mx = pl.norm_change(x_end, x)
     cyc = Cycle(pl, recs)
     _, frames = cyc.sample(20)
-    z_front, q_cms = cyc.h2o_front(frames)
+    wf = cyc.h2o_front(frames)
+    z_front, q_cms = wf["front_zL"], wf["cms_max_rel"]
     purge_step = 0.5 * float(np.sum(met["purge_mol"]))
     purge_target = PURGE_X * pl.g.volume * N_NORMAL
     rec = dict(iter=it, params=dict(params), O2_ppm=met["product_O2_ppm"], air_factor=met["air_factor"],
                recovery_N2=met["recovery_N2"], purge_step_mol=purge_step, purge_target_mol=purge_target,
-               h2o_front_zL=z_front, alumina_top_zL=cyc.z_al, h2o_cms_max_rel=q_cms, css_iterations=len(hist),
+               h2o_front_zL=z_front, alumina_top_zL=cyc.z_al, h2o_cms_max_rel=q_cms,
+               h2o_interface_y_rel=wf["interface_y_rel"], css_iterations=len(hist),
                css_change_rms=rms, wall_s=time.time() - t0, p_tank_min=None)
     history.append(rec)
     css.save(dict(case=case, x=x, hist=hist, metrics=met), HERE / a.out / f"iter{it:02d}")
     log("  -> " + json.dumps({k: (round(v, 5) if isinstance(v, float) else v) for k, v in rec.items() if k != "params"}))
     ok_o2 = abs(met["product_O2_ppm"] / O2_TARGET - 1) < O2_TOL
     ok_purge = abs(purge_step / purge_target - 1) < 0.03
-    ok_h2o = z_front <= 0.8 * cyc.z_al
+    ok_h2o = z_front <= 0.8 * cyc.z_al and q_cms < 0.1  # loading front in the lower 80 % of the alumina
     if ok_o2 and ok_purge and ok_h2o:
         log("  sized.")
         break
