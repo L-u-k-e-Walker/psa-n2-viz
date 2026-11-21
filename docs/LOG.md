@@ -308,3 +308,8 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   4.1e-2). Near the noise floor the decay estimates scatter around 1.000 and many jumps are rejected,
   so the gain is ~3-4x. The end criterion is unchanged (plain-cycle change) and the final state is verified
   by full-model cycles. Used for the 180-cell final (`trace_css.py --accel`).
+- Round runs_n180b, iteration 2: **0.9048 m CMS, 13.1 cm alumina, cv_purge 3.89e-4: O2 4,435 ppm, air factor
+  2.97, N2 recovery 42.5 %, purge 0.1448 vs 0.1452 mol, CMS water 0.56 %, interface 0.62 %: sized (180
+  cells)**. The finer grid needs 15 % less CMS than the 60-cell grid (1.064 m) and gives a better air factor
+  (2.97 vs 3.18). The chain started the 360-cell run (run_2n.py, 30-map cap, trace seed); phase1_final.py
+  starts the final CSS from this state.

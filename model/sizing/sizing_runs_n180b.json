@@ -1,0 +1,74 @@
+{
+ "target_O2_ppm": 4500.0,
+ "history": [
+  {
+   "iter": 1,
+   "params": {
+    "h_cms": 0.8705,
+    "h_al": 0.1313,
+    "cv_purge": 0.00037322994997987123,
+    "n_al": 30,
+    "n_cms": 180
+   },
+   "O2_ppm": 5893.872132843698,
+   "air_factor": 2.9194967393904925,
+   "recovery_N2": 0.4312758232038353,
+   "purge_step_mol": 0.1393418509308232,
+   "purge_target_mol": 0.14041455325901203,
+   "h2o_front_zL": 0.12669528182604642,
+   "alumina_top_zL": 0.13106408464763422,
+   "h2o_cms_max_rel": 0.005618397327981004,
+   "h2o_interface_y_rel": 0.004660619100621297,
+   "css_iterations": 6,
+   "css_change_rms": 0.00014719478587034912,
+   "wall_s": 2118.775408744812,
+   "p_tank_min": null
+  },
+  {
+   "iter": 2,
+   "params": {
+    "h_cms": 0.9048,
+    "h_al": 0.1313,
+    "cv_purge": 0.00038898036577139503,
+    "n_al": 30,
+    "n_cms": 180
+   },
+   "O2_ppm": 4434.918623548879,
+   "air_factor": 2.9676720976154694,
+   "recovery_N2": 0.4248947890478083,
+   "purge_step_mol": 0.14483717160769297,
+   "purge_target_mol": 0.14522211881779026,
+   "h2o_front_zL": 0.12250104558762026,
+   "alumina_top_zL": 0.12672521957340027,
+   "h2o_cms_max_rel": 0.00559743703219937,
+   "h2o_interface_y_rel": 0.006188235982183249,
+   "css_iterations": 6,
+   "css_change_rms": 5.170716569426712e-05,
+   "wall_s": 2243.868650197983,
+   "p_tank_min": null
+  }
+ ],
+ "final": {
+  "iter": 2,
+  "params": {
+   "h_cms": 0.9048,
+   "h_al": 0.1313,
+   "cv_purge": 0.00038898036577139503,
+   "n_al": 30,
+   "n_cms": 180
+  },
+  "O2_ppm": 4434.918623548879,
+  "air_factor": 2.9676720976154694,
+  "recovery_N2": 0.4248947890478083,
+  "purge_step_mol": 0.14483717160769297,
+  "purge_target_mol": 0.14522211881779026,
+  "h2o_front_zL": 0.12250104558762026,
+  "alumina_top_zL": 0.12672521957340027,
+  "h2o_cms_max_rel": 0.00559743703219937,
+  "h2o_interface_y_rel": 0.006188235982183249,
+  "css_iterations": 6,
+  "css_change_rms": 5.170716569426712e-05,
+  "wall_s": 2243.868650197983,
+  "p_tank_min": null
+ }
+}
