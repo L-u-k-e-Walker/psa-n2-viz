@@ -61,13 +61,54 @@ start = HERE / "sizing" / "n180_start.npy"
 if not start.exists():
     run(PY + [HERE / "upsample.py", HERE / "sizing" / "runs_n60c" / f"iter{it60:02d}", start,
               json.dumps({"n_al": 30, "n_cms": 180})], ROOT)
-s180 = HERE / "sizing" / "sizing_runs_n180.json"
-if not s180.exists():
-    params = dict(p60, n_al=30, n_cms=180)
-    run(PY + [HERE / "sizing" / "size_bed.py", "--start", json.dumps(params), "--warm", start, "--out", "runs_n180",
-              "--max-iter", "3", "--tol", "5e-5", "--slope", f"{min(slope, -1.0):.3f}"], HERE / "sizing")
-n180 = json.loads(s180.read_text())
-src180 = HERE / "sizing" / "runs_n180" / f"iter{n180['final']['iter']:02d}"
+def sized(rec):
+    """Same acceptance as size_bed.py."""
+    return (abs(rec["O2_ppm"] / 4500.0 - 1) < 0.03 and abs(rec["purge_step_mol"] / rec["purge_target_mol"] - 1) < 0.03
+            and rec["h2o_cms_max_rel"] < 0.05 and rec["h2o_interface_y_rel"] < 0.05)
+
+
+def size_running(out):
+    r = subprocess.run(["pgrep", "-f", f"size_bed.py.*--out {out}"], capture_output=True, text=True)
+    return bool(r.stdout.strip())
+
+
+# 180-cell sizing: rounds runs_n180, runs_n180b, ... until sized (a round already running is waited for)
+rnd, prev = 0, None
+while True:
+    out = "runs_n180" + ("" if rnd == 0 else chr(ord("a") + rnd))
+    js = HERE / "sizing" / f"sizing_{out}.json"
+    if not js.exists():
+        if size_running(out):
+            log(f"waiting for the running sizing round {out}")
+            while size_running(out) and not js.exists():
+                time.sleep(30)
+        else:
+            if prev is None:
+                params, warm, sl = dict(p60, n_al=30, n_cms=180), start, slope
+            else:
+                h = prev["history"]
+                params = dict(prev["final"]["params"])
+                warm = HERE / "sizing" / prev_out / f"iter{prev['final']['iter']:02d}"
+                sl = slope
+                if len(h) >= 2 and abs(h[-1]["params"]["h_cms"] - h[-2]["params"]["h_cms"]) > 1e-4:
+                    sl = (math.log(h[-1]["O2_ppm"]) - math.log(h[-2]["O2_ppm"])) / (h[-1]["params"]["h_cms"] - h[-2]["params"]["h_cms"])
+                # size_bed.py applies its update rule after the last iteration only when continuing, so
+                # restart from the last evaluated point with the slope measured at 180 cells
+            run(PY + [HERE / "sizing" / "size_bed.py", "--start", json.dumps(params), "--warm", warm, "--out", out,
+                      "--max-iter", "4", "--tol", "5e-5", "--slope", f"{min(sl, -1.0):.3f}"], HERE / "sizing")
+    if not js.exists():
+        log(f"sizing round {out} ended without its json")
+        sys.exit(1)
+    cur = json.loads(js.read_text())
+    log(f"sizing round {out}: final {cur['final']['params']}, O2 {cur['final']['O2_ppm']:.0f} ppm, sized {sized(cur['final'])}")
+    if sized(cur["final"]):
+        break
+    prev, prev_out, rnd = cur, out, rnd + 1
+    if rnd > 3:
+        log("180-cell sizing not converged after 4 rounds")
+        sys.exit(1)
+n180 = cur
+src180 = HERE / "sizing" / out / f"iter{n180['final']['iter']:02d}"
 log(f"180-cell sizing: {n180['final']['params']}, O2 {n180['final']['O2_ppm']:.0f} ppm, state {src180}")
 if not (HERE / "grid" / "2N" / "metrics.json").exists():
     run(PY + [HERE / "grid" / "run_2n.py", "--src", src180, "--rtol", "1e-6", "--tol", "5e-5"], HERE / "grid")
