@@ -313,3 +313,17 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   cells)**. The finer grid needs 15 % less CMS than the 60-cell grid (1.064 m) and gives a better air factor
   (2.97 vs 3.18). The chain started the 360-cell run (run_2n.py, 30-map cap, trace seed); phase1_final.py
   starts the final CSS from this state.
+
+### G1e result and the final grid (2026-11-21)
+- 360-cell run of the 180-cell sized beds (model/grid/2N, 30-map cap, trace seed): product O2 3,122 ppm vs 4,435 ppm
+  at 180 cells (30 % apart; limit 5 %), recovery 42.5 % vs 42.5 %, air factor 2.97. First-order upwind's numerical
+  dispersion is still significant at 180 cells; ln(O2) ~ 1/N extrapolates to ~2,200 ppm grid-converged, and 5 %
+  between N and 2N would need ~1,300 cells (infeasible with the dense-Jacobian BDF). **G1e not met.**
+- User decision: the 360-cell state is the final state (same beds, 0.905 m CMS; product O2 ~3,100 ppm, within the
+  5,000 ppm spec); G1e reported as not met with these numbers (gates_phase1.py compares the 180-cell sized state
+  with 360 cells and prints the extrapolation).
+- The 180-cell final (model/css/final_180_aborted) was stopped: its accelerated march jumped 83,000 cycles at rms
+  1.7e-7 (near the target the decay estimates are noise and max_step/max|d| grows without bound) and threw the
+  state back to 1.2e-5. Fixed: no jumps within 5x the march target, at most 1,500 cycles per jump.
+- phase1_final.py now converges the 360-cell trace profiles (trace_css.py from model/grid/2N -> model/css/final),
+  then gates, Gate 3, DESIGN.md and the HD draft.
