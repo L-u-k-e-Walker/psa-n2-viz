@@ -1,0 +1,84 @@
+{
+ "G1a": {
+  "css_cycle": {
+   "system": 2.5444647169560654e-13,
+   "per_bed": 2.057296658809976e-13,
+   "receiver": 5.006865092122894e-15,
+   "system_per_component": {
+    "N2": 4.749643003017782e-15,
+    "O2": 3.960923438976028e-16,
+    "Ar": 4.630872876345992e-15,
+    "CO2": 6.625858853761989e-16,
+    "H2O": 2.5444647169560654e-13
+   }
+  },
+  "startup_cycles_max": 2.8840323590061002e-11,
+  "limit": 0.0001,
+  "pass": true
+ },
+ "G1b": {
+  "css_change_rms": 2.965042688776591e-07,
+  "css_change_max": 2.166292596723712e-06,
+  "limit": 1e-06,
+  "cycle_balance_per_component": {
+   "N2": 1.9442891093976345e-06,
+   "O2": 6.6393151618146995e-06,
+   "Ar": 3.0179424936850233e-07,
+   "CO2": 1.884619274467404e-06,
+   "H2O": 0.00020941801069439435
+  },
+  "cycle_balance_limit": 0.005,
+  "pass": true
+ },
+ "G1d": {
+  "max_scaled_diff": 2.1936461685815083e-06,
+  "limit": 0.0001,
+  "pass": true
+ },
+ "G1e": {
+  "pass_": null,
+  "note": "model/grid/2N not run yet"
+ },
+ "G1f": {
+  "product_O2_ppm": 4483.582231930397,
+  "O2_limit_ppm": 5000.0,
+  "air_factor": 3.1835013869186133,
+  "air_factor_band": [
+   2.0,
+   3.5
+  ],
+  "h2o_loading_front_zL": 0.10981015304842345,
+  "alumina_top_zL": 0.10981015304842345,
+  "h2o_on_cms_max_rel_to_feed_eq": 0.006489566719479642,
+  "h2o_interface_y_rel_during_production": 0.008655930885393516,
+  "product_CO2_ppm": 0.016699277945862227,
+  "product_H2O_ppm": 0.0017531630012355523,
+  "eq_residual": [
+   0.03014914356085888,
+   0.030149171534299024
+  ],
+  "eq_limit": 0.05,
+  "p_tank_min_bar": 7.481399993486106,
+  "p_deliver_bar": 7.01325,
+  "product_Ar_pct": 1.197929058625816,
+  "N2_excl_Ar_pct": 98.35371087293707,
+  "recovery_N2": 0.396054332076764,
+  "productivity_Nm3_h_m3": 99.93842135695478,
+  "checks": {
+   "O2": true,
+   "air_factor": true,
+   "h2o_in_alumina": true,
+   "co2_negligible": 1.0,
+   "eq_nearly_equal": 1.0,
+   "regulator_supplied": true
+  },
+  "pass": true
+ },
+ "psa_sim_crosscheck": "skipped: psa-sim supports several columns, equalization and >2 components, but not this case (no simultaneous top+bottom equalization, no layered bed, no bidirectional product valve / back-flow, no Darken LDF); per docs/MISSION.md",
+ "G1c": {
+  "source": "model/regression/g1c.json",
+  "max_diff_rtol_1e-9": 7.010705121990313e-08,
+  "pass": true
+ },
+ "all_pass": false
+}

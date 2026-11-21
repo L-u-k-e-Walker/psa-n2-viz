@@ -283,3 +283,8 @@ vectors differ in length, so the error norms pick different steps). Trace specie
 - model/phase1_final.py (unattended): sized 180-cell state -> trace_css.py -> model/css/final (G1b target
   1e-6, rtol 1e-7) -> gates_phase1.py once model/grid/2N is done -> gate3_spotcheck.py -> draft on the final
   physics. Runs beside phase1_chain.py.
+- Gate dry run on the converged 60-cell state (gates_phase1.py css/runs/trace60, no 2N; gates_dryrun.json):
+  G1a PASS (start-up cycles 2.9e-11), G1b PASS (3.0e-7 rms, 2.2e-6 max; balances < 0.5 %), G1c PASS,
+  G1d PASS (2.2e-6), G1f PASS (O2 4,484 ppm, air factor 3.18, CMS water 0.65 % of feed equilibrium,
+  interface y_H2O 0.87 % of feed, product CO2 0.017 ppm, receiver >= 7.48 bar vs 7.01 delivery), G1e n/a.
+  The pipeline is ready for the 180-cell state.
