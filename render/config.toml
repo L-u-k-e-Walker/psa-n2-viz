@@ -10,7 +10,7 @@ literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, 
 molecule speed and trace-species counts."""
 
 [layout]
-option = "B"            # A | B | C, picked at the Phase 2 checkpoint
+option = "D"            # A | B | C | D; D = conventional twin towers (user, v05 review)
 pressure_unit = "barg"  # barg | bara
 
 [timing]

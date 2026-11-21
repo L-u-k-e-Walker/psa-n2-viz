@@ -16,6 +16,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.ticker  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Polygon, Rectangle  # noqa: E402
 
@@ -47,6 +48,16 @@ LAYOUTS = {
         bot_split=44, top_split=44, purge_gap=26,
         train="compact",
         feed_y=975, vent_y=1020, top_y=300, prod_y=150, train_x=20, receiver=(1170, 104, 1230, 244), out="down",
+        timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
+        readouts=(1330, 696), footnote=(36, 1072)),
+    "D": dict(  # conventional twin-tower P&ID: manifolds between the beds, a profile chart beside each bed
+        name="twin towers with manifolds", pid="manifold", title=(36, 24), legend=(1330, 866),
+        beds=[(200, 320, 310, 730), (1010, 320, 1120, 730)], prof="per_bed_all", label_side=["left", "right"],
+        prof_boxes=[(380, 320, 600, 730), (720, 320, 940, 730)],
+        # manifold levels (design px, y from the top), from the beds outwards
+        eq_top_y=272, purge_y=222, prod_y=172, recv_line_y=124, eq_bot_y=792, vent_y=852, feed_y=912,
+        feed_out_y=992, vent_out_y=1024, valve_dx=175, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
+        train_x=20, train="compact", receiver=(1150, 96, 1204, 214), silencer_x=1130,
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
@@ -332,7 +343,136 @@ class Composer:
         self._net_key, self._net_obj, self._geo = key, net, geo
         return net, geo
 
+    def _net_manifold(self):
+        """Conventional twin-tower piping: horizontal manifolds between the bed verticals, one valve per
+        bed on each, the outlet/inlet tee in the middle (the equalization lines have one valve)."""
+        key = ("manifold", None if self.nozzles is None else tuple(map(tuple, self.nozzles)))
+        if getattr(self, "_net_key", "unset") == key:
+            return self._net_obj, self._geo
+        L, T = self.L, self.T
+        beds = [self.bed_geometry(k) for k in (0, 1)]
+        cx = [0.5 * (b[0] + b[2]) for b in beds]
+        mid = 0.5 * (cx[0] + cx[1])
+        if self.nozzles is not None:
+            y_tops = [nz[0] for nz in self.nozzles]
+            y_bots = [nz[1] for nz in self.nozzles]
+        else:
+            y_tops = [b[1] - 14 for b in beds]
+            y_bots = [b[3] + 14 for b in beds]
+        et, pu, pr, rl = L["eq_top_y"], L["purge_y"], L["prod_y"], L["recv_line_y"]
+        eb, ve, fe = L["eq_bot_y"], L["vent_y"], L["feed_y"]
+        fo, vo = L["feed_out_y"], L["vent_out_y"]
+        txf, txv, txp, txq = L["tee_feed_x"], L["tee_vent_x"], L["tee_prod_x"], L["tee_purge_x"]
+        rx0, ry0, rx1, ry1 = L["receiver"]
+        rcx = 0.5 * (rx0 + rx1)
+        sx = L["silencer_x"]
+        tx = L["train_x"]
+        x_in = tx + 170
+        yf = self.cyc.pl.yf
+        mcfg = self.cfg.get("molecules", {}).get("weights", {})
+        w = [mcfg.get(sp, 1.0) for sp in SPECIES]
+        pcfg = self.cfg.get("pipes", {})
+        net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 16.0),
+                      vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05))
+        bot = lambda fr, k: fr[f"y{k}"][:, 0]  # noqa: E731
+        top = lambda fr, k: fr[f"y{k}"][:, -1]  # noqa: E731
+        tank = lambda fr: fr["y_tank"]  # noqa: E731
+
+        def pos(x):
+            return np.maximum(x, 0.0)
+
+        # bed verticals, split at each manifold level (segment flows = everything passing through it)
+        for k in (0, 1):
+            o = 1 - k
+            F = lambda d, names, k=k: sum(d[f"F{k}_{n}"] for n in names)  # noqa: E731
+            # bottom: nozzle -> eq_bot -> vent -> feed (down = away from the bed)
+            net.add(f"vb0_{k}", [(cx[k], y_bots[k]), (cx[k], eb)], lambda d, F=F: -F(d, ("feed", "vent", "eq_bot")),
+                    lambda fr, Fv, k=k, o=o: bot(fr, k) if Fv > 0 else _mix([(pos(fr[f"F{k}_feed"]), yf), (pos(fr[f"F{k}_eq_bot"]), bot(fr, o))]))
+            net.add(f"vb1_{k}", [(cx[k], eb), (cx[k], ve)], lambda d, F=F: -F(d, ("feed", "vent")),
+                    lambda fr, Fv, k=k: bot(fr, k) if Fv > 0 else yf)
+            net.add(f"vb2_{k}", [(cx[k], ve), (cx[k], fe)], lambda d, F=F: -F(d, ("feed",)),
+                    lambda fr, Fv, k=k: bot(fr, k) if Fv > 0 else yf)
+            # top: nozzle -> eq_top -> purge -> product (up = away from the bed)
+            net.add(f"vt0_{k}", [(cx[k], y_tops[k]), (cx[k], et)], lambda d, F=F: -F(d, ("product", "purge", "eq_top")),
+                    lambda fr, Fv, k=k, o=o: top(fr, k) if Fv > 0 else _mix([(pos(fr[f"F{k}_product"]) + pos(fr[f"F{k}_purge"]), tank(fr)),
+                                                                            (pos(fr[f"F{k}_eq_top"]), top(fr, o))]))
+            net.add(f"vt1_{k}", [(cx[k], et), (cx[k], pu)], lambda d, F=F: -F(d, ("product", "purge")),
+                    lambda fr, Fv, k=k: top(fr, k) if Fv > 0 else tank(fr))
+            net.add(f"vt2_{k}", [(cx[k], pu), (cx[k], pr)], lambda d, F=F: -F(d, ("product",)),
+                    lambda fr, Fv, k=k: top(fr, k) if Fv > 0 else tank(fr))
+        # manifolds: left half carries bed 1's flow, right half bed 2's (+ = towards the tee / bed 2)
+        net.add("eq_bot", [(cx[0], eb), (cx[1], eb)], lambda d: d["F1_eq_bot"], lambda fr, F: bot(fr, 0) if F > 0 else bot(fr, 1))
+        net.add("eq_top", [(cx[0], et), (cx[1], et)], lambda d: d["F1_eq_top"], lambda fr, F: top(fr, 0) if F > 0 else top(fr, 1))
+        net.add("vent_l", [(cx[0], ve), (txv, ve)], lambda d: -d["F0_vent"], lambda fr, F: bot(fr, 0))
+        net.add("vent_r", [(cx[1], ve), (txv, ve)], lambda d: -d["F1_vent"], lambda fr, F: bot(fr, 1))
+        net.add("feed_l", [(txf, fe), (cx[0], fe)], lambda d: d["F0_feed"], lambda fr, F: yf if F > 0 else bot(fr, 0))
+        net.add("feed_r", [(txf, fe), (cx[1], fe)], lambda d: d["F1_feed"], lambda fr, F: yf if F > 0 else bot(fr, 1))
+        net.add("prod_l", [(cx[0], pr), (txp, pr)], lambda d: -d["F0_product"], lambda fr, F: top(fr, 0) if F > 0 else tank(fr))
+        net.add("prod_r", [(cx[1], pr), (txp, pr)], lambda d: -d["F1_product"], lambda fr, F: top(fr, 1) if F > 0 else tank(fr))
+        net.add("purge_l", [(txq, pu), (cx[0], pu)], lambda d: d["F0_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        net.add("purge_r", [(txq, pu), (cx[1], pu)], lambda d: d["F1_purge"], lambda fr, F: tank(fr), tube_w=11.0)
+        # risers / outlets
+        prod_mix = lambda fr, F: (_mix([(pos(-fr["F0_product"]), top(fr, 0)), (pos(-fr["F1_product"]), top(fr, 1))])  # noqa: E731
+                                  if F > 0 else tank(fr))
+        net.add("prod_up", [(txp, pr), (txp, rl), (txq, rl)], lambda d: -(d["F0_product"] + d["F1_product"]), prod_mix)
+        net.add("recv_in", [(txq, rl), (rx0, rl)],
+                lambda d: -(d["F0_product"] + d["F1_product"]) - (d["F0_purge"] + d["F1_purge"]),
+                lambda fr, F: prod_mix(fr, 1.0) if F > 0 else tank(fr))
+        net.add("purge_down", [(txq, rl), (txq, pu)], lambda d: d["F0_purge"] + d["F1_purge"], lambda fr, F: tank(fr),
+                tube_w=11.0, halo=True)
+        net.add("product_out", [(rcx, ry1), (rcx, ry1 + 72)], lambda d: d["F_product_out"],
+                lambda fr, F: tank(fr))
+        net.add("feed_in", [(x_in, fo), (txf, fo), (txf, fe)], lambda d: d["F0_feed"] + d["F1_feed"], lambda fr, F: yf)
+        net.add("vent_out", [(txv, ve), (txv, vo), (sx, vo)], lambda d: -(d["F0_vent"] + d["F1_vent"]),
+                lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))]) if F > 0 else bot(fr, 0),
+                halo=True)
+        for i, pts in enumerate([[(tx + 48, fo), (tx + 64, fo)], [(tx + 90, fo), (tx + 100, fo)], [(tx + 152, fo), (x_in, fo)]]):
+            net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None)
+        net.finish()
+        vdx = L["valve_dx"]
+        geo = dict(cx=cx, mid=mid, et=et, pu=pu, pr=pr, eb=eb, ve=ve, fe=fe, fo=fo, vo=vo, tx=tx, sx=sx, rcx=rcx,
+                   receiver=(rx0, ry0, rx1, ry1), valves_x=[cx[0] + vdx, cx[1] - vdx])
+        self._net_key, self._net_obj, self._geo = key, net, geo
+        return net, geo
+
+    def _pid_manifold(self, fig, fr):
+        T = self.T
+        ax = fig.add_axes([0, 0, 1, 1], zorder=0)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        net, g = self._net_manifold()
+        net.draw_tubes(ax)
+        net.draw_gas(ax, fr, [T[sp] for sp in SPECIES])
+        net.draw_chevrons(ax, fr)
+        vx = g["valves_x"]
+        for k in (0, 1):
+            self._valve(ax, vx[k], g["fe"], fr[f"open{k}_feed"], vertical=False)
+            self._valve(ax, vx[k], g["ve"], fr[f"open{k}_vent"], vertical=False)
+            self._valve(ax, vx[k], g["pr"], fr[f"open{k}_product"], vertical=False)
+            self._valve(ax, vx[k], g["pu"], fr[f"open{k}_purge"], vertical=False, size=11, needle=True)
+        self._valve(ax, g["mid"], g["eb"], fr["open0_eq_bot"], vertical=False)
+        self._valve(ax, g["mid"], g["et"], fr["open0_eq_top"], vertical=False)
+        # line names at the left end of each manifold (between bed 1 and its valve)
+        for y, lab in ((g["et"], "equalization"), (g["pu"], "purge"), (g["pr"], "product"),
+                       (g["eb"], "equalization"), (g["ve"], "exhaust"), (g["fe"], "feed")):
+            self.text(fig, g["cx"][0] + 14, y - 12, lab, size=10, color=T["muted"], va="bottom")
+        tx, fo, vo = g["tx"], g["fo"], g["vo"]
+        self._compressor(ax, tx + 24, fo)
+        self._vessel(ax, tx + 77, fo - 45, 26, 70, None)
+        self._box_icon(ax, tx + 100, fo - 20, 52, 40, "dryer", small=True)
+        self.text(fig, tx, fo + 34, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
+                  size=10, color=T["muted"])
+        self._box_icon(ax, g["sx"], vo - 15, 56, 30, "silencer", small=True)
+        self.text(fig, g["sx"] + 64, vo - 9, "vent", size=11, color=T["muted"])
+        rx0, ry0, rx1, ry1 = g["receiver"]
+        self._vessel(ax, g["rcx"], ry0, rx1 - rx0, ry1 - ry0, "N$_2$ receiver")
+        self._regulator(ax, g["rcx"], ry1 + 30, vertical=True)
+        self.text(fig, g["rcx"] + 34, ry1 + 16, "N$_2$ product\n30 SLPM, 6 barg", size=10.5, linespacing=1.25)
+
     def _pid(self, fig, fr):
+        if self.L.get("pid") == "manifold":
+            return self._pid_manifold(fig, fr)
         T, L = self.T, self.L
         ax = fig.add_axes([0, 0, 1, 1], zorder=0)
         ax.set_xlim(0, W)
@@ -446,7 +586,45 @@ class Composer:
                                         color=T[SPECIES[i]], mec=T["bg"], transform=fig.transFigure, figure=fig))
             self.text(fig, xx + 13, y, lab, size=10.5, color=T["ink2"])
 
+    def _species_panel(self, a, y, show_y):
+        """All five species of one bed on one log mole-fraction axis (0.1 ppm .. 100 %)."""
+        T = self.T
+        for i in (IN2, IO2, IAR, ICO2, IH2O):
+            a.plot(np.maximum(y[i], 1e-9), self.z, color=T[SPECIES[i]], lw=2.0 * self.s)
+        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        a.set(xscale="log", xlim=(1e-7, 1.6), ylim=(0, 1))
+        a.set_xticks([1e-6, 1e-3, 1])
+        a.set_xticklabels(["1 ppm", "0.1 %", "100 %"])
+        a.set_xticks([1e-7, 1e-5, 1e-4, 1e-2, 1e-1], minor=True)
+        a.tick_params(which="minor", length=0)
+        a.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        a.grid(True, which="minor", color=T["grid"], lw=0.6 * self.s)
+        a.set_yticks([0, 0.5, 1] if show_y else [])
+        if show_y:
+            a.set_ylabel("height  z / L", fontsize=self.fs(11.5))
+        a.set_xlabel("mole fraction in the gas (log)", fontsize=self.fs(11))
+
+    def _species_key(self, fig, box, title=None):
+        T = self.T
+        x, y = box[0], box[1] - 30
+        if title:
+            self.text(fig, x, y - 2, title, size=12, fontweight="bold")
+            x += 62
+        for j, i in enumerate((IN2, IO2, IAR, ICO2, IH2O)):
+            xx = x + j * 44
+            fig.lines.append(plt.Line2D([self.fx(xx + 5)], [self.fy(y + 8)], marker="o", ms=6 * self.s,
+                                        color=T[SPECIES[i]], mec=T["bg"], transform=fig.transFigure, figure=fig))
+            self.text(fig, xx + 12, y, SPECIES_TEX[SPECIES[i]], size=10.5, color=T["ink2"])
+
     def _profiles(self, fig, fr):
+        if self.L["prof"] == "per_bed_all":
+            for k in (0, 1):
+                box = self.L["prof_boxes"][k]
+                a = self.box_axes(fig, box)
+                self._species_panel(a, fr[f"y{k}"], show_y=True)
+                self._axis_style(a)
+                self._species_key(fig, box, title=f"Bed {k + 1}")
+            return
         if self.L["prof"] == "shared":
             b1, b2 = self.L["prof_boxes"]
             curves = [(fr["y0"], "-"), (fr["y1"], "--")]
