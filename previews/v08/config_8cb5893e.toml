@@ -1,0 +1,66 @@
+# psa-n2-viz render config: every look setting lives here (one renderer, three quality tiers).
+# render.py copies this file next to each mock/draft as config_<hash8>.toml; `--final vNN` reuses
+# that snapshot unchanged. Colours come from psan2viz/style.py (validated set, docs/MISSION.md).
+
+[text]
+title = "PSA nitrogen generator"
+subtitle = "Two carbon-molecular-sieve beds at cyclic steady state"
+footnote = """Isothermal LDF model of both beds, the receiver and the valves, at cyclic steady state; \
+literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, particle size, \
+molecule speed and trace-species counts."""
+
+[layout]
+option = "E"            # A..E; E = twin towers with two 3-way valves per end (user, v06 review)
+pressure_unit = "barg"  # barg | bara
+valve_style = "isa"     # plain | isa | ball: ISA P&ID bodies with diaphragm actuators (user, valve review)
+
+[timing]
+# Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
+# Knots: start, end of equalization, end of the fast early part of production/blowdown, end of the half.
+half_cycle_knots = [0.0, 1.0, 7.0, 60.0]
+half_video_knots = [0.0, 1.5, 4.5, 15.0]
+
+[tiers.mock]
+size = [960, 540]
+times_s = [0.4, 3.0, 12.0, 45.0, 60.4, 63.0, 72.0, 105.0]  # cycle times of the contact-sheet stills
+sheet_cols = 2
+
+[tiers.draft]
+size = [960, 540]
+fps = 15                 # every second frame of the 30 fps timeline
+theme = "white"          # white only (user, v06 review)
+renderer = "auto"        # auto (faster of opengl / tachyon without AO, timed on the scene) | opengl | tachyon_fast
+sheet_frames = 8
+
+[tiers.draft_hd]          # render.py --draft --hd: full resolution and frame rate, no AO (fast OpenGL beds)
+size = [1920, 1080]
+fps = 30
+theme = "white"
+renderer = "opengl"
+sheet_frames = 8
+
+[tiers.final]
+size = [1920, 1080]
+fps = 30
+themes = ["white"]       # white only (user, v06 review)
+gif_fps = 15
+gif_max_mb = 50
+ao_samples = 12
+aa_samples = 12
+
+[molecules]
+# trace species are drawn at exaggerated counts (weights shown in the footnote)
+weights = { N2 = 1.0, O2 = 1.0, Ar = 3.0, CO2 = 60.0, H2O = 30.0 }
+n_ref = 1100             # molecules drawn in one bed at the feed pressure (before weights)
+# drift speed in the beds: v = speed_max tanh(speed_gain u_int / speed_max) bed lengths per video second,
+# u_int the solver's interstitial velocity (m/s); monotonic, not to scale (the fronts are not affected)
+speed_gain = 4.0
+speed_max = 1.5
+jitter = 0.03
+
+[pipes]
+# gas dots in the piping: v = vmax tanh(sqrt(|F| / f_ref)) px per video second (F the solver's molar flow)
+tube_px = 16.0
+dot_spacing_px = 16.0
+vmax_px_s = 260.0
+f_ref_mol_s = 0.05

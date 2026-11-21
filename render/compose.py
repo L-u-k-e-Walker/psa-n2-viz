@@ -193,7 +193,7 @@ class Composer:
             self.text(fig, self.L["footnote"][0], self.L["footnote"][1], self.cfg.get("text", {}).get("footnote", ""),
                       size=10.5, color=T["muted"], va="bottom")
             if watermark:
-                fig.text(0.985, 0.012, watermark, ha="right", va="bottom", fontsize=self.fs(26), color=T["muted"],
+                fig.text(0.985, 0.045, watermark, ha="right", va="bottom", fontsize=self.fs(26), color=T["muted"],
                          fontweight="bold", alpha=0.85)
             fig.savefig(out, dpi=100)
             plt.close(fig)
