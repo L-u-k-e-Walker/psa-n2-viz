@@ -12,6 +12,7 @@ molecule speed and trace-species counts."""
 [layout]
 option = "E"            # A..E; E = twin towers with two 3-way valves per end (user, v06 review)
 pressure_unit = "barg"  # barg | bara
+valve_style = "isa"     # plain | isa | ball: ISA P&ID bodies with diaphragm actuators (user, valve review)
 
 [timing]
 # Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
@@ -29,6 +30,13 @@ size = [960, 540]
 fps = 15                 # every second frame of the 30 fps timeline
 theme = "white"          # white only (user, v06 review)
 renderer = "auto"        # auto (faster of opengl / tachyon without AO, timed on the scene) | opengl | tachyon_fast
+sheet_frames = 8
+
+[tiers.draft_hd]          # render.py --draft --hd: full resolution and frame rate, no AO (fast OpenGL beds)
+size = [1920, 1080]
+fps = 30
+theme = "white"
+renderer = "opengl"
 sheet_frames = 8
 
 [tiers.final]

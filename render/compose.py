@@ -234,9 +234,14 @@ class Composer:
             self.text(fig, xl, y1 - 0.55 * (y1 - y0), "CMS", size=10, ha=ha, va="center", color=T["muted"])
 
     # -------------------------------------------------------------------- P&ID
-    def _valve(self, ax, x, y, open_, vertical=True, size=13, needle=False):
+    def _valve(self, ax, x, y, open_, vertical=True, size=13, needle=False, actuator=True):
+        style = self.cfg.get("layout", {}).get("valve_style", "plain")
+        if style == "ball":
+            return self._valve_ball(ax, x, y, open_, vertical, size, needle)
         T = self.T
         s = size
+        if style == "isa" and not needle and actuator:
+            self._actuator(ax, x, y, "l" if vertical else "u", size)
         if vertical:
             tri = ([(x - s * 0.8, y - s), (x + s * 0.8, y - s), (x, y)], [(x - s * 0.8, y + s), (x + s * 0.8, y + s), (x, y)])
         else:
@@ -566,13 +571,75 @@ class Composer:
         self._net_key, self._net_obj, self._geo = key, net, geo
         return net, geo
 
+    def _actuator(self, ax, x, y, side, size):
+        """Pneumatic diaphragm actuator (ISA): a stem from the body and a dome."""
+        T = self.T
+        vec = {"u": (0, -1), "d": (0, 1), "l": (-1, 0), "r": (1, 0)}
+        ux, uy = vec[side]
+        L = 1.9 * size
+        ax.plot([x, x + ux * L], [y, y + uy * L], color=T["ink2"], lw=1.3 * self.s, zorder=5.5)
+        cx_, cy_ = x + ux * L, y + uy * L
+        ang = math.degrees(math.atan2(-uy, ux))  # display y is flipped
+        from matplotlib.patches import Wedge
+        ax.add_patch(Wedge((cx_, cy_), 0.85 * size, ang - 90, ang + 90, fc=T["bg"], ec=T["ink2"], lw=1.3 * self.s, zorder=5.6))
+        px, py = -uy, ux
+        ax.plot([cx_ - px * 0.85 * size, cx_ + px * 0.85 * size], [cy_ - py * 0.85 * size, cy_ + py * 0.85 * size],
+                color=T["ink2"], lw=1.3 * self.s, zorder=5.7)
+
+    def _valve_ball(self, ax, x, y, open_, vertical, size, needle):
+        """Ball-valve icon: round body on the tube, the bore drawn along the pipe when open, across when shut;
+        a needle valve shows a tapered pin."""
+        T = self.T
+        r = 0.95 * size
+        ax.add_patch(plt.Circle((x, y), r, fc=T["bg"], ec=T["ink"], lw=1.8 * self.s, zorder=6))
+        if needle:
+            ax.add_patch(Polygon([(x - 0.35 * r, y - 0.75 * r), (x + 0.35 * r, y - 0.75 * r), (x, y + 0.35 * r)],
+                                 closed=True, fc=T["ink"], ec="none", zorder=7))
+            ax.plot([x - 1.25 * r, x + 1.25 * r], [y + 1.25 * r, y - 1.25 * r], color=T["ink2"], lw=1.1 * self.s, zorder=7)
+            ax.add_patch(Polygon([(x + 1.25 * r, y - 1.25 * r), (x + 0.8 * r, y - 1.15 * r), (x + 1.15 * r, y - 0.8 * r)],
+                                 closed=True, fc=T["ink2"], ec="none", zorder=7))
+            return
+        along = (vertical and open_) or (not vertical and not open_)
+        if along:
+            ax.plot([x, x], [y - 0.72 * r, y + 0.72 * r], color=T["ink"] if open_ else T["muted"], lw=4.0 * self.s,
+                    zorder=7, solid_capstyle="round")
+        else:
+            ax.plot([x - 0.72 * r, x + 0.72 * r], [y, y], color=T["ink"] if open_ else T["muted"], lw=4.0 * self.s,
+                    zorder=7, solid_capstyle="round")
+
+    def _valve3_ball(self, ax, x, y, dirs, open_ports, size):
+        """3-way ball valve: the L bore joins the common port (the bed, dirs[0]) to the open port."""
+        T = self.T
+        r = 1.05 * size
+        vec = {"u": (0, -1), "d": (0, 1), "l": (-1, 0), "r": (1, 0)}
+        ax.add_patch(plt.Circle((x, y), r, fc=T["bg"], ec=T["ink"], lw=1.8 * self.s, zorder=6))
+        for p in dirs:  # port stubs
+            ux, uy = vec[p]
+            ax.plot([x + ux * r, x + ux * 1.25 * r], [y + uy * r, y + uy * 1.25 * r], color=T["ink"], lw=1.8 * self.s, zorder=6)
+        ports = [p for p in dirs if p in open_ports]
+        if ports:
+            for p in ports:
+                ux, uy = vec[p]
+                ax.plot([x, x + ux * 0.72 * r], [y, y + uy * 0.72 * r], color=T["ink"], lw=4.0 * self.s, zorder=7,
+                        solid_capstyle="round")
+        else:  # shut: the bore faces the blank side
+            ax.plot([x - 0.4 * r, x + 0.4 * r], [y - 0.4 * r, y + 0.4 * r], color=T["muted"], lw=4.0 * self.s, zorder=7,
+                    solid_capstyle="round")
+        ax.add_patch(plt.Circle((x, y), 2.4, fc=T["ink"], ec="none", zorder=8))
+
     def _valve3(self, ax, x, y, dirs, open_ports, size=14):
         """3-way valve: one triangle per port (apex at the centre), filled where the path is open.
         dirs: port directions ('u', 'd', 'l', 'r'); open_ports: set of open ones (the common port fills
         whenever any other port is open)."""
+        style = self.cfg.get("layout", {}).get("valve_style", "plain")
+        if style == "ball":
+            return self._valve3_ball(ax, x, y, dirs, open_ports, size)
         T = self.T
         s = size
         vec = {"u": (0, -1), "d": (0, 1), "l": (-1, 0), "r": (1, 0)}
+        if style == "isa":
+            out = {"r": "l", "l": "r"}[dirs[2]]  # actuator on the outer side, away from the inner line
+            self._actuator(ax, x, y, out, size)
         for p in dirs:
             ux, uy = vec[p]
             px, py = -uy, ux
@@ -739,6 +806,28 @@ class Composer:
 
     def _regulator(self, ax, x, y, vertical=False):
         T = self.T
+        style = self.cfg.get("layout", {}).get("valve_style", "plain")
+        if style in ("isa", "ball"):
+            self._valve(ax, x, y, True, vertical=vertical, size=10, actuator=False)
+            # pressure regulator: diaphragm dome on a stem plus a spring (zigzag) above it
+            side = 1
+            if vertical:
+                ax.plot([x, x + 16], [y, y], color=T["ink2"], lw=1.2 * self.s, zorder=6)
+                from matplotlib.patches import Wedge
+                ax.add_patch(Wedge((x + 16, y), 8, -90, 90, fc=T["bg"], ec=T["ink2"], lw=1.2 * self.s, zorder=6))
+                ax.plot([x + 16, x + 16], [y - 8, y + 8], color=T["ink2"], lw=1.2 * self.s, zorder=6)
+                zx = x + 24 + np.arange(7) * 3.0
+                zy = y + np.array([0, -4, 4, -4, 4, -4, 0])
+                ax.plot(zx, zy, color=T["ink2"], lw=1.0 * self.s, zorder=6)
+            else:
+                ax.plot([x, x], [y, y - 16], color=T["ink2"], lw=1.2 * self.s, zorder=6)
+                from matplotlib.patches import Wedge
+                ax.add_patch(Wedge((x, y - 16), 8, 0, 180, fc=T["bg"], ec=T["ink2"], lw=1.2 * self.s, zorder=6))
+                zy = y - 24 - np.arange(7) * 3.0
+                zx = x + np.array([0, -4, 4, -4, 4, -4, 0])
+                ax.plot(zx, zy, color=T["ink2"], lw=1.0 * self.s, zorder=6)
+            del side
+            return
         self._valve(ax, x, y, True, vertical=vertical, size=9)
         if vertical:
             ax.plot([x, x + 18], [y, y], color=T["muted"], lw=1.2 * self.s, zorder=6)

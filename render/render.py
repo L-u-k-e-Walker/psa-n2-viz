@@ -215,14 +215,14 @@ def run_draft(args, cfg, cfg_path):
         timing = time_renderers(args, cfg)
         renderer = "opengl" if timing["opengl"] <= timing["tachyon_fast"] else "tachyon"
     # keyed by version too: the config can stay the same while the drawing code changes (v03 reused v02 frames)
-    outdir = ROOT / "frames" / f"{ver}_{h}_draft_{tier['theme']}"
+    outdir = ROOT / "frames" / f"{ver}_{h}_draft{'_hd' if args.hd else ''}_{tier['theme']}"
     outdir.mkdir(parents=True, exist_ok=True)
     n_frames = int(round(cfg["timing"]["half_video_knots"][-1] * 2 * tier["fps"]))
     edges = np.linspace(0, n_frames, args.workers + 1).astype(int)
     env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
     t1 = time.time()
     procs = [subprocess.Popen([sys.executable, "-I", __file__, "--draft-worker", str(a_), str(b_), str(outdir), renderer,
-                               ver, "--config", str(snap), "--css", args.css], env=env)
+                               ver, "--config", str(snap), "--css", args.css] + (["--hd"] if args.hd else []), env=env)
              for a_, b_ in zip(edges[:-1], edges[1:])]
     codes = [p_.wait() for p_ in procs]
     t_frames = time.time() - t1
@@ -332,6 +332,7 @@ def main():
     ap.add_argument("--version", default=None)
     ap.add_argument("--config", default=str(HERE / "config.toml"))
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--hd", action="store_true", help="draft at full resolution and frame rate ([tiers.draft_hd])")
     if "--final-worker" in sys.argv:  # internal: one worker of a final render
         i = sys.argv.index("--final-worker")
         a_, b_, outdir, theme = sys.argv[i + 1:i + 5]
@@ -350,8 +351,11 @@ def main():
         ap2 = argparse.ArgumentParser()
         ap2.add_argument("--config")
         ap2.add_argument("--css", default=str(CSS_DIR))
+        ap2.add_argument("--hd", action="store_true")
         wa = ap2.parse_args(rest)
         cfg = tomllib.loads(Path(wa.config).read_text())
+        if wa.hd:
+            cfg["tiers"]["draft"] = cfg["tiers"]["draft_hd"]
         draft_worker(wa, cfg, int(a_), int(b_), Path(outdir), renderer, ver)
         return
     args = ap.parse_args()
@@ -363,6 +367,8 @@ def main():
             sys.exit(f"--final {args.final}: expected one config snapshot in previews/{args.final}, found {len(snaps)}")
         args.config = str(snaps[0])
     cfg = tomllib.loads(Path(args.config).read_text())
+    if args.hd:
+        cfg["tiers"]["draft"] = cfg["tiers"]["draft_hd"]
     if args.mock:
         run_mock(args, cfg, args.config)
     elif args.draft:
