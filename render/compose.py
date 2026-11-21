@@ -78,7 +78,7 @@ LAYOUTS = {
         v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
-        analyzer_w=172, analyzer_h=72, analyzer_gap=52,
+        analyzer_w=172, analyzer_h=72, analyzer_gap=52, clock=(752, 66, 44),
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
@@ -201,6 +201,8 @@ class Composer:
             self._readouts(fig, fr)
             self._legend(fig)
             self._title(fig, fr)
+            if "clock" in self.L:
+                self._clock(fig, fr)
             self.text(fig, self.L["footnote"][0], self.L["footnote"][1], self.cfg.get("text", {}).get("footnote", ""),
                       size=10.5, color=T["muted"], va="bottom")
             if watermark:
@@ -845,6 +847,74 @@ class Composer:
         self._net_key, self._net_obj, self._geo = key, net, geo
         return net, geo
 
+    def _playback_rate(self, tc):
+        """Seconds of cycle per second of video at cycle time tc (from the timing knots)."""
+        tm = self.cfg.get("timing", {})
+        ck = np.asarray(tm.get("half_cycle_knots", [0.0, 60.0]), float)
+        vk = np.asarray(tm.get("half_video_knots", [0.0, 15.0]), float)
+        th = float(np.mod(tc, ck[-1]))
+        i = int(np.clip(np.searchsorted(ck, th, side="right") - 1, 0, len(ck) - 2))
+        return (ck[i + 1] - ck[i]) / (vk[i + 1] - vk[i])
+
+    def _clock(self, fig, fr):
+        """Analog cycle clock (0-120 s per turn): the hand slows down in slow motion; its trail spans the
+        cycle time covered in the last 1.5 s of video; a tag states the playback speed."""
+        T = self.T
+        cx_, cy_, r = self.L["clock"]
+        tc = float(fr["t_cycle"])
+        Tc = float(self.t_cycle)
+        rate = self._playback_rate(tc)
+        ax = fig.add_axes([0, 0, 1, 1], zorder=2)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        lw = lambda px: px * 0.72 * self.s  # noqa: E731
+
+        def pt(t, rr):  # clockwise from 12 o'clock (display y is down)
+            a = 2 * math.pi * t / Tc
+            return cx_ + rr * math.sin(a), cy_ - rr * math.cos(a)
+
+        ax.add_patch(plt.Circle((cx_, cy_), r, fc=T["bg"], ec=T["ink2"], lw=lw(2.0), zorder=1))
+        # the two half-cycles: equalization windows marked on the rim
+        for t0 in (0.0, 0.5 * Tc):
+            ts = np.linspace(t0, t0 + float(self.cyc.case.t_eq), 12)
+            xy = np.array([pt(t, r - 3.5) for t in ts])
+            ax.plot(xy[:, 0], xy[:, 1], color=T["O2"], lw=lw(4.0), solid_capstyle="butt", zorder=2)
+        for k in range(24):
+            t = k * Tc / 24
+            major = k % 6 == 0
+            a0, a1 = pt(t, r - (9 if major else 5)), pt(t, r - 1.5)
+            ax.plot([a0[0], a1[0]], [a0[1], a1[1]], color=T["ink2"] if major else T["muted"], lw=lw(1.6 if major else 1.0), zorder=2)
+        for t, lab in ((0, "0"), (Tc / 4, "30"), (Tc / 2, "60"), (3 * Tc / 4, "90")):
+            x, y = pt(t, r - 17)
+            ax.text(x, y, lab, ha="center", va="center", fontsize=self.fs(8.5), color=T["muted"], zorder=3)
+        # trail: cycle time covered in the last 1.5 s of video (long when fast, almost none in slow motion)
+        span = min(rate * 1.5, 0.45 * Tc)
+        ts = np.linspace(tc - span, tc, 30)
+        poly = [(cx_, cy_)] + [pt(t, r - 2.5) for t in ts]
+        ax.add_patch(Polygon(poly, closed=True, fc=T["ink2"], ec="none", alpha=0.18, zorder=3))
+        hx, hy = pt(tc, r - 6)
+        ax.plot([cx_, hx], [cy_, hy], color=T["ink"], lw=lw(2.6), solid_capstyle="round", zorder=4)
+        ax.add_patch(plt.Circle((cx_, cy_), 3.4, fc=T["ink"], ec="none", zorder=5))
+        # labels
+        x0 = cx_ + r + 16
+        self.text(fig, x0, cy_ - r + 2, "cycle clock", size=10, color=T["muted"])
+        self.text(fig, x0, cy_ - r + 18, f"{tc:5.1f} s of {Tc:.0f} s", size=12.5, fontweight="bold")
+        if rate < 0.9:
+            tag = f"slow motion · {1 / rate:.0f}× slower"
+        elif rate <= 1.1:
+            tag = "real time"
+        else:
+            tag = f"{rate:.0f}× faster"
+        bx, by = x0, cy_ + 8
+        if rate < 0.9:
+            ax.add_patch(FancyBboxPatch((bx - 8, by - 3), 252, 28, boxstyle="round,pad=0,rounding_size=13",
+                                        fc=T["highlight"], ec=T["O2"], lw=lw(1.6), zorder=1))
+        self.text(fig, bx + 4, by + 3, tag, size=12, color=T["ink"] if rate < 0.9 else T["ink2"],
+                  fontweight="bold" if rate < 0.9 else "normal")
+        ax.plot([bx, bx + 14], [by + 41, by + 41], color=T["O2"], lw=lw(4.0), solid_capstyle="butt", zorder=2)
+        self.text(fig, bx + 20, by + 34, "equalization (1 s per half-cycle)", size=9, color=T["muted"])
+
     def _analyzer(self, fig, ax, box, y):
         """Outlet analyzer readout: N2, Ar, O2 of the gas leaving the bed (the solver's top cell)."""
         T = self.T
@@ -1240,5 +1310,7 @@ class Composer:
         tx = self.cfg.get("text", {})
         self.text(fig, x, y, tx.get("title", "PSA nitrogen generator"), size=26, fontweight="bold")
         self.text(fig, x, y + 40, tx.get("subtitle", ""), size=14.5, color=T["ink2"])
+        if "clock" in self.L:  # the cycle clock shows the time
+            return
         self.text(fig, x, y + 64, f"t / t$_{{cycle}}$ = {fr['frac']:.3f}   (t$_{{cycle}}$ = {self.t_cycle:.0f} s)", size=13.5,
                   color=T["ink2"], family="DejaVu Sans Mono")

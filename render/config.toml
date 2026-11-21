@@ -17,8 +17,10 @@ valve_style = "spool"   # layout F: ball | butterfly | spool | piston; spool (us
 [timing]
 # Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
 # Knots: start, end of equalization, end of the fast early part of production/blowdown, end of the half.
-half_cycle_knots = [0.0, 1.0, 7.0, 60.0]
-half_video_knots = [0.0, 1.5, 4.5, 15.0]
+# Slow motion for the short steps (user, v09 review): equalization 1 s -> 4 s of video (4x slower), then a ramp
+# (real time, ~1.7x, ~3x) into the long steady part (~8x faster). The cycle clock shows the playback speed.
+half_cycle_knots = [0.0, 1.0, 2.5, 5.0, 10.0, 60.0]
+half_video_knots = [0.0, 4.0, 5.5, 7.0, 8.6, 15.0]
 
 [tiers.mock]
 size = [960, 540]
