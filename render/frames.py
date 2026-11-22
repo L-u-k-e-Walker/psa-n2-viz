@@ -58,8 +58,12 @@ def file_hash(path, extra=""):
     return h.hexdigest()[:12]
 
 
-def load_cycle(css_dir=CSS_DIR):
+def load_cycle(css_dir=CSS_DIR, integrate=True):
+    """The CSS cycle. integrate=False (frame cache present): timing, geometry and plant only, no integration
+    (a full cycle takes ~17 min at 360 cells, and every render worker used to repeat it)."""
     case, pl, x = css.load(css_dir)
+    if not integrate:
+        return Cycle(pl, [dict(duration=seg.duration) for seg in case.segments()])
     _, recs = pl.run_cycle(x)
     return Cycle(pl, recs)
 
@@ -69,7 +73,7 @@ def frame_cache(timing, css_dir=CSS_DIR, cache_dir=HERE / "cache", log=print):
     css_file = Path(css_dir) / "css_state.npz"
     key = file_hash(css_file, json.dumps(timing, sort_keys=True) + f"fps{FPS_TIMELINE}v{CACHE_VERSION}")
     path = Path(cache_dir) / f"frames_{key}.npz"
-    cyc = load_cycle(css_dir)
+    cyc = load_cycle(css_dir, integrate=not path.exists())
     tm = TimeMap(cyc.case.t_half, timing["half_cycle_knots"], timing["half_video_knots"])
     if path.exists():
         d = dict(np.load(path, allow_pickle=False))
