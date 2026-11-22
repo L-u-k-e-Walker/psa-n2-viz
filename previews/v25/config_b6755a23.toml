@@ -1,0 +1,85 @@
+# psa-n2-viz render config: every look setting lives here (one renderer, three quality tiers).
+# render.py copies this file next to each mock/draft as config_<hash8>.toml; `--final vNN` reuses
+# that snapshot unchanged. Colours come from psan2viz/style.py (validated set, docs/MISSION.md).
+
+[text]
+font = "Inter"            # bundled in render/fonts (SIL OFL); user, v19 review
+title = "CONVENTIONAL CMS PSA N$_2$ GENERATOR"   # PSA, not VPSA: docs/RESEARCH_regeneration.md
+subtitle = "30 SLPM N$_2$  ·  99.5 %  ·  from 7.5 barg air  ·  two CMS beds, 120 s cycle"   # spec line (user, v19 review)
+footnote = """Isothermal LDF model of both beds, the receiver and the valves, at cyclic steady state; literature, fitted \
+or assumed inputs, nothing measured.
+Not to scale: geometry, particle size, molecule speed and trace-species counts. Valve motion drawn over 0.3 s of \
+video (the model switches instantly)."""
+
+[layout]
+cards = true             # light rounded panel cards (user, v19 review)
+valve_motion_s = 0.3     # spools / slides glide over this much video (cosmetic; user, v19 review)
+option = "F"            # A..F; F = twin towers, L-port 3-way valves, outlet analyzers (user, v08 review)
+pressure_unit = "barg"  # barg | bara
+valve_style = "spool"   # layout F: ball | butterfly | spool | piston; spool (user, valve options review)
+
+[timing]
+# Piecewise-linear map from cycle time to video time, per half-cycle (the second half mirrors it).
+# Knots: start, end of equalization, end of the fast early part of production/blowdown, end of the half.
+# Slow motion where things happen fast (user, v09/v10 reviews): equalization is exponential with a ~0.15 s time
+# constant (bed 1 goes 1.1 -> 3.1 bar in 0.2 s), so its first 0.3 s get 4.5 s of video (15x slower); then
+# ~3.5x slower to the end of equalization, ~2x slower for the first 2 s of pressurization / blowdown, about
+# real time to 8 s, 2.4x faster to 20 s and 5x faster for the steady rest. Loop 60 s.
+half_cycle_knots = [0.0, 0.3, 1.0, 3.0, 8.0, 20.0, 60.0]
+half_video_knots = [0.0, 4.5, 7.0, 11.5, 17.0, 22.0, 30.0]
+
+[tiers.mock]
+size = [960, 540]
+times_s = [0.4, 3.0, 12.0, 45.0, 60.4, 63.0, 72.0, 105.0]  # cycle times of the contact-sheet stills
+sheet_cols = 2
+
+[tiers.draft]
+size = [960, 540]
+fps = 15                 # every second frame of the 30 fps timeline
+theme = "white"          # white only (user, v06 review)
+renderer = "auto"        # auto (faster of opengl / tachyon without AO, timed on the scene) | opengl | tachyon_fast
+sheet_frames = 8
+
+[tiers.draft_hd]          # render.py --draft --hd: full resolution and frame rate, no AO (fast OpenGL beds)
+size = [1920, 1080]
+fps = 30
+theme = "white"
+renderer = "opengl"
+sheet_frames = 8
+
+[tiers.final]
+size = [1920, 1080]
+fps = 30
+themes = ["white"]       # white only (user, v06 review)
+gif_fps = 15
+gif_max_mb = 50
+ao_samples = 12
+aa_samples = 12
+
+[beds]
+loading_strength = 0.45  # bed colour ramps end on a pale tint (user, v10 review: O2 molecules lost in deep red)
+
+[molecules]
+# trace species are drawn at exaggerated counts (weights shown in the footnote)
+weights = { N2 = 1.0, O2 = 1.0, Ar = 3.0, CO2 = 60.0, H2O = 30.0 }
+n_ref = 1100             # molecules drawn in one bed at the feed pressure (before weights)
+# drift speed in the beds: v = speed_max tanh(speed_gain u_int / speed_max) bed lengths per video second,
+# u_int the solver's interstitial velocity (m/s); monotonic, not to scale (the fronts are not affected)
+speed_gain = 4.0
+speed_max = 1.5
+jitter = 0.03
+
+# quieter N2 (user, v19 review): N2 is 80-99 % of every gas, so its dots are drawn smaller and lighter
+quiet_n2 = { radius = 0.85, lighten = 0.0 }  # in the beds (v24 review: molecules too faint in the columns)
+render_scale = 1.6        # bed molecules drawn 1.6x their placement radius, so they read between the pellets
+
+[pipes]
+n2_dot_scale = 0.75       # N2 dots smaller and softer than the others (user, v19 review)
+n2_alpha = 0.55
+# gas dots in the piping (layout F): v = vmax tanh(sqrt((|F|/P) / (f_ref/P_feed))) px per video second, F the solver's
+# molar flow and P the line pressure (so the speed follows the actual volumetric flow)
+tube_px = 16.0
+dot_spacing_px = 11.0    # at the feed pressure; the density follows the line pressure (layout F)
+density_exponent = 1.0   # dots per px ~ (P / P_feed)^exponent: 1 = molar density, as for the bed molecules
+vmax_px_s = 260.0
+f_ref_mol_s = 0.05

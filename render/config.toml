@@ -70,7 +70,8 @@ speed_max = 1.5
 jitter = 0.03
 
 # quieter N2 (user, v19 review): N2 is 80-99 % of every gas, so its dots are drawn smaller and lighter
-quiet_n2 = { radius = 0.72, lighten = 0.35 }
+quiet_n2 = { radius = 0.85, lighten = 0.0 }  # in the beds (v24 review: molecules too faint in the columns)
+render_scale = 1.6        # bed molecules drawn 1.6x their placement radius, so they read between the pellets
 
 [pipes]
 n2_dot_scale = 0.75       # N2 dots smaller and softer than the others (user, v19 review)
