@@ -1178,38 +1178,39 @@ class Composer:
         self._axis_style(a)
         self.text(fig, bo[0], y0 - 30, "O$_2$ in gas", size=10, color=T["ink2"])
         self.text(fig, bo[0] + 8, y1 + 22, "O$_2$ %", size=10, color=T["muted"])
-        # sorbent loading, % of each sorbent's own equilibrium loading with feed air. The two sorbents get
-        # separate axes with a gap: loading belongs to the solid, so it jumps where the material changes
-        # (the gas profile beside it stays continuous)
-        q = fr[f"q{k}"]
-        rel = 100 * q / self.q_ref
+        # sorbent loading in mmol per gram of sorbent, one axis for both layers (user, v16 review). Loading belongs
+        # to the solid, so it steps where the material changes (drawn as a horizontal step at the boundary);
+        # water on the alumina (1.7-4 mmol/g) is off this scale and printed as a number
+        q = fr[f"q{k}"]  # mol/kg = mmol/g
         al = ~self.cms_cells
-        cm = self.cms_cells
-        yb = y1 - self.z_al * (y1 - y0)  # layer boundary (px)
-        gap = 7.0
-        a = self.box_axes(fig, (bl[0], y0, bl[2], yb - gap / 2))
-        zc = self.z[cm]
-        a.fill_betweenx(zc, 0, rel[IN2][cm], color=T["N2"], alpha=0.16, lw=0)
-        a.plot(rel[IN2][cm], zc, color=T["N2"], lw=2.0 * self.s)
-        a.fill_betweenx(zc, 0, rel[IO2][cm], color=T["O2"], alpha=0.22, lw=0)
-        a.plot(rel[IO2][cm], zc, color=T["O2"], lw=2.4 * self.s)
-        a.set(xlim=(0, 105), ylim=(self.z_al, 1), xticks=[0, 50, 100], yticks=[])
-        a.tick_params(labelbottom=False)
+        zb = self.z_al
+        zz = np.concatenate([[0.0], self.z[al], [zb, zb], self.z[~al], [1.0]])
+
+        def stepped(v):
+            va, vc = v[al], v[~al]
+            return np.concatenate([[va[0]], va, [va[-1], vc[0]], vc, [vc[-1]]])
+
+        a = self.box_axes(fig, bl)
+        a.axhspan(0, zb, color=T["highlight"], lw=0, zorder=0)
+        n2, o2 = stepped(q[IN2]), stepped(q[IO2])
+        a.fill_betweenx(zz, 0, n2, color=T["N2"], alpha=0.16, lw=0)
+        a.plot(n2, zz, color=T["N2"], lw=2.0 * self.s)
+        a.fill_betweenx(zz, 0, o2, color=T["O2"], alpha=0.22, lw=0)
+        a.plot(o2, zz, color=T["O2"], lw=2.4 * self.s)
+        a.axhline(zb, color=T["axis"], lw=1.0 * self.s)
+        a.set(xlim=(0, 1.05), ylim=(0, 1), xticks=[0, 0.5, 1.0], yticks=[])
+        a.set_xticklabels(["0", "0.5", "1"])
         self._axis_style(a)
-        a.text(1.04, 0.5, "CMS", transform=a.transAxes, rotation=90, ha="left", va="center", fontsize=self.fs(8.5), color=T["ink2"])
-        b = self.box_axes(fig, (bl[0], yb + gap / 2, bl[2], y1))
-        b.set_facecolor(T["highlight"])
-        za = np.concatenate([[0.0], self.z[al], [self.z_al]])
-        ext = lambda v: np.concatenate([[v[al][0]], v[al], [v[al][-1]]])  # noqa: E731
-        b.fill_betweenx(za, 0, ext(rel[IH2O]), color=T["H2O"], alpha=0.30, lw=0)
-        b.plot(ext(rel[IH2O]), za, color=T["H2O"], lw=2.0 * self.s)
-        b.plot(ext(rel[IO2]), za, color=T["O2"], lw=2.2 * self.s)
-        b.plot(ext(rel[IN2]), za, color=T["N2"], lw=1.6 * self.s)
-        b.set(xlim=(0, 105), ylim=(0, self.z_al), xticks=[0, 50, 100], yticks=[])
-        self._axis_style(b)
-        b.text(1.04, 0.5, "alumina", transform=b.transAxes, rotation=90, ha="left", va="center", fontsize=self.fs(7.5), color=T["ink2"])
+        w = float(np.mean(q[IH2O][al]))
+        tr = a.get_yaxis_transform()  # x in axes fraction, y in data (height)
+        a.text(1.05, 0.5 * (zb + 1), "CMS", transform=tr, rotation=90, ha="left", va="center", fontsize=self.fs(8.5),
+               color=T["ink2"], clip_on=False)
+        a.text(1.05, 0.72 * zb, "alumina", transform=tr, ha="left", va="center", fontsize=self.fs(8), color=T["ink2"],
+               clip_on=False)
+        a.text(1.05, 0.25 * zb, f"H$_2$O {w:.1f}", transform=tr, ha="left", va="center", fontsize=self.fs(8),
+               color=T["H2O"], fontweight="bold", clip_on=False)
         self.text(fig, bl[0] + 4, y0 - 30, "loading", size=10, color=T["ink2"])
-        self.text(fig, bl[0], y1 + 22, "% of equilibrium\nwith feed air", size=9.5, color=T["muted"], linespacing=1.15)
+        self.text(fig, bl[0], y1 + 22, "mmol per g\nof sorbent", size=9.5, color=T["muted"], linespacing=1.15)
         for j, (i, lab) in enumerate(((IO2, "O$_2$"), (IN2, "N$_2$"), (IH2O, "H$_2$O"))):
             xx = bl[0] + j * 30
             fig.lines.append(plt.Line2D([self.fx(xx + 4)], [self.fy(y0 - 6)], marker="o", ms=5 * self.s, color=T[SPECIES[i]],
