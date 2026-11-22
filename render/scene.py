@@ -173,7 +173,8 @@ class BedScene:
             if mirror:
                 pp[:, 0] = -pp[:, 0]
             pt.create_property("Position", data=pp)
-            pt.create_property("Radius", data=np.full(len(pp), dots["r"]))
+            rs = dots.get("r_scale")
+            pt.create_property("Radius", data=dots["r"] * (rs[dots["sp"]] if rs is not None else np.ones(len(pp))))
             pt.create_property("Color", data=colors[dots["sp"]])
         self.gas_pipe.source.data = g
 

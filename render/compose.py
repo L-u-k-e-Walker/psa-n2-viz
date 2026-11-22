@@ -25,6 +25,11 @@ sys.path.insert(0, str(ROOT))
 from pipes import PipeNet, _mix  # noqa: E402
 from valves import STYLES as VALVE_STYLES, ValveArt  # noqa: E402
 from psan2viz.performance import performance  # noqa: E402
+
+from matplotlib import font_manager as _fm  # noqa: E402
+
+for _f in sorted((Path(__file__).resolve().parent / "fonts").glob("*.ttf")):  # bundled typefaces (Inter, SIL OFL)
+    _fm.fontManager.addfont(str(_f))
 from psan2viz.style import SPECIES, SPECIES_ROLE, SPECIES_TEX, THEMES, apply_ramp, loading_ramp, mpl_rc  # noqa: E402
 
 W, H = 1920, 1080
@@ -80,9 +85,11 @@ LAYOUTS = {
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
         analyzer_w=172, analyzer_h=72, analyzer_gap=52,
-        timing=(1330, 52, 1890, 330), pressure=(1330, 372, 1890, 548),  # no product-O2 panel (user, v10 review)
-        power=(1330, 588, 1890, 762),  # feed-compressor power over the cycle (user, v18 review)
-        readouts=(1330, 800), footnote=(36, 1072), colour_keys=(20, 560)),
+        timing=(1330, 52, 1890, 330), pressure=(1330, 404, 1890, 562),  # no product-O2 panel (user, v10 review)
+        power=(1330, 612, 1890, 772),  # feed-compressor power over the cycle (user, v18 review)
+        readouts=(1330, 822), footnote=(36, 1072), colour_keys=(20, 560),
+        cards=[(1316, 40, 1904, 384), (1316, 392, 1904, 594), (1316, 602, 1904, 804), (1316, 812, 1904, 1030),
+               (336, 296, 968, 802)]),  # light panel cards (user, v19 review)
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -184,8 +191,20 @@ class Composer:
     # ------------------------------------------------------------------ frame
     def draw(self, fr, out, beds_3d=None, watermark=None):
         T = self.T
-        with plt.rc_context(mpl_rc(self.theme, self.s)):
+        cards = self.L.get("cards") if self.cfg.get("layout", {}).get("cards", False) else None
+        rc = mpl_rc(self.theme, self.s, self.cfg.get("text", {}).get("font", "DejaVu Sans"))
+        if cards:
+            rc["axes.facecolor"] = "none"  # charts sit on the cards
+        with plt.rc_context(rc):
             fig = plt.figure(figsize=(self.size[0] / 100, self.size[1] / 100), dpi=100)
+            if cards:
+                axc = fig.add_axes([0, 0, 1, 1], zorder=-1)
+                axc.set_xlim(0, W)
+                axc.set_ylim(H, 0)
+                axc.set_axis_off()
+                for (x0, y0, x1, y1) in cards:
+                    axc.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=14",
+                                                 fc=T["card"], ec="none"))
             self._pid(fig, fr)
             if beds_3d is None:
                 self._beds_flat(fig, fr)
@@ -790,7 +809,8 @@ class Composer:
         p_feed, p_vent = float(cs.p_feed), float(cs.p_vent)
         net = PipeNet(self.d, yf, w, T, self.s, tube_w=pcfg.get("tube_px", 16.0), spacing=pcfg.get("dot_spacing_px", 11.0),
                       vmax=pcfg.get("vmax_px_s", 260.0), f_ref=pcfg.get("f_ref_mol_s", 0.05), p_ref=p_feed,
-                      density_exponent=pcfg.get("density_exponent", 1.0))
+                      density_exponent=pcfg.get("density_exponent", 1.0), n2_scale=pcfg.get("n2_dot_scale", 1.0),
+                      n2_alpha=pcfg.get("n2_alpha", 0.95))
         # line pressures (bar abs): the bed a line opens to, the feed header, the receiver, the vent
         Pk = lambda d, k: d[f"P{k}"]  # noqa: E731
         any_open = lambda d, v: np.asarray(d[f"open0_{v}"], bool) | np.asarray(d[f"open1_{v}"], bool)  # noqa: E731
@@ -940,6 +960,46 @@ class Composer:
             self.text(fig, x0 + 23, yy, lab, size=10.5, color=T["ink2"], va="center")
             self.text(fig, x1 - 10, yy, val, size=10.5, ha="right", va="center", fontweight="bold")
 
+    def _valve_tracks(self):
+        """Spool / slide positions per frame for the switching motion (user, v19 review: cosmetic; the model's
+        valves switch instantly). Each moves towards its target at a constant rate, over layout.valve_motion_s
+        of video; simulated over two loops so the loop seam matches. Returns {name: array over frames} or None."""
+        tau = float(self.cfg.get("layout", {}).get("valve_motion_s", 0.0))
+        if tau <= 0:
+            return None
+        if getattr(self, "_vtracks", None) is not None:
+            return self._vtracks
+        d = self.d
+        n = len(d["t_video"])
+        ob = lambda key: np.asarray(d[key], bool)  # noqa: E731
+        eqb, eqt = ob("open0_eq_bot"), ob("open0_eq_top")
+        tg = {}
+        for k in (0, 1):
+            sg = -1.0 if k == 0 else 1.0  # spool over the outer port when the inner one is open (bed 1: left, bed 2: right)
+            ib, obb = ob(f"open{k}_feed") | eqb, ob(f"open{k}_vent")
+            tg[f"b{k}"] = np.where(ib, sg, np.where(obb, -sg, np.nan))
+            it, ot = ob(f"open{k}_product") | eqt, ob(f"open{k}_purge")
+            tg[f"t{k}"] = np.where(it, sg, np.where(ot, -sg, np.nan))
+        tg["feed_in"] = (ob("open0_feed") | ob("open1_feed")).astype(float)
+        tg["prod_out"] = (ob("open0_product") | ob("open1_product")).astype(float)
+        fps = 30.0
+        out = {}
+        for name, t in tg.items():
+            rng = 2.0 if name in ("b0", "b1", "t0", "t1") else 1.0
+            step = rng / (fps * tau)
+            valid = ~np.isnan(t)
+            x = float(t[valid][0]) if valid.any() else 0.0
+            arr = np.empty(n)
+            for pas in range(2):
+                for f in range(n):
+                    if valid[f]:
+                        x += float(np.clip(t[f] - x, -step, step))
+                    if pas:
+                        arr[f] = x
+            out[name] = arr
+        self._vtracks = out
+        return out
+
     def _pid_lport(self, fig, fr):
         T = self.T
         ax = fig.add_axes([0, 0, 1, 1], zorder=0)
@@ -955,14 +1015,18 @@ class Composer:
                       tube_w=self.cfg.get("pipes", {}).get("tube_px", 16.0))
         cx = g["cx"]
         eqb, eqt = bool(fr["open0_eq_bot"]), bool(fr["open0_eq_top"])
+        tracks = self._valve_tracks()
+        fi = int(round(float(fr["t_video"]) * 30.0)) % len(self.d["t_video"])
+        pos = (lambda name: float(tracks[name][fi])) if tracks else (lambda name: None)
         for k in (0, 1):
             inner, outer = ("r", "l") if k == 0 else ("l", "r")
             ob = "inner" if (fr[f"open{k}_feed"] or eqb) else ("outer" if fr[f"open{k}_vent"] else None)
-            va.three_way(cx[k], g["vb"], "u", inner, outer, ob)
+            va.three_way_at(cx[k], g["vb"], "u", inner, outer, ob, pos(f"b{k}"))
             ot = "inner" if (fr[f"open{k}_product"] or eqt) else ("outer" if fr[f"open{k}_purge"] else None)
-            va.three_way(cx[k], g["vt"], "d", inner, outer, ot)
-        va.two_way(g["txf"], 0.5 * (g["vb"] + g["ve"]), bool(fr["open0_feed"]) or bool(fr["open1_feed"]), "v")
-        va.two_way(g["txp"], 0.5 * (g["vt"] + g["pu"]), bool(fr["open0_product"]) or bool(fr["open1_product"]), "v")
+            va.three_way_at(cx[k], g["vt"], "d", inner, outer, ot, pos(f"t{k}"))
+        va.two_way_at(g["txf"], 0.5 * (g["vb"] + g["ve"]), bool(fr["open0_feed"]) or bool(fr["open1_feed"]), "v", pos("feed_in"))
+        va.two_way_at(g["txp"], 0.5 * (g["vt"] + g["pu"]), bool(fr["open0_product"]) or bool(fr["open1_product"]), "v",
+                      pos("prod_out"))
         va.needle(g["txq"], 0.5 * (g["rl"] + g["pu"]), "v")
         for x, y, lab in ((cx[0] + 62, g["vt"] - 14, "product · top equalization"), (cx[0] + 62, g["pu"] - 10, "purge"),
                           (cx[0] + 62, g["vb"] - 14, "feed · bottom equalization"), (cx[0] + 62, g["ve"] - 12, "exhaust")):
@@ -1232,26 +1296,45 @@ class Composer:
         c_in = pl.yf * (float(pl.case.p_feed) * 1e5 / pl.RT)  # mol/m3 of each species in the feed
         c = fr[f"y{k}"] * fr[f"C{k}"][None, :]
         a = self.box_axes(fig, box)
-        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        a.axhspan(0, self.z_al, color=T["grid"], alpha=0.6, lw=0, zorder=0)  # alumina band (visible on the card)
         a.axvline(1.0, color=T["muted"], lw=1.0 * self.s, ls=(0, (3, 3)), zorder=1)
         a.plot(c[IAR] / c_in[IAR], self.z, color=T["Ar"], lw=1.8 * self.s, ls=(0, (4, 2.5)), zorder=3)  # Ar follows N2: dashed
         for i in (IN2, IO2, ICO2, IH2O):
             a.plot(c[i] / c_in[i], self.z, color=T[SPECIES[i]], lw=2.3 * self.s, zorder=4 if i == IN2 else 3)
         a.set(xlim=(0, 1.3), ylim=(0, 1), xticks=[0, 0.5, 1.0], yticks=[0, 0.5, 1])
         a.set_xticklabels(["0", "0.5", "1"])
-        a.set_ylabel("height  z / L", fontsize=self.fs(11))
+        if k == 0:
+            a.set_ylabel("height  z / L", fontsize=self.fs(11))
         a.set_xlabel("p / p$_{in}$   partial pressure (feed = 1)", fontsize=self.fs(10.5))
         self._axis_style(a)
         a.text(0.98, 0.5 * self.z_al, "alumina", transform=a.get_yaxis_transform(), ha="right", va="center",
                fontsize=self.fs(9), color=T["ink2"])
         a.text(0.98, self.z_al + 0.02, "CMS", transform=a.get_yaxis_transform(), ha="right", va="bottom",
                fontsize=self.fs(9), color=T["ink2"])
-        self._species_key(fig, box, title=f"Bed {k + 1}")
+        self.text(fig, box[0], box[1] - 30, f"Bed {k + 1}", size=12, fontweight="bold")
+
+    def _conc_legend(self, fig):
+        """One vertically stacked species legend between the two concentration charts (user, v19 review)."""
+        T = self.T
+        b0, b1 = self.L["prof_boxes"]
+        xc = 0.5 * (b0[2] + b1[0]) - 22
+        y = 0.5 * (b0[1] + b0[3]) - 62
+        ax = fig.add_axes([0, 0, 1, 1], zorder=2)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.set_axis_off()
+        self.text(fig, xc - 6, y - 26, "gas", size=10.5, fontweight="bold", color=T["ink2"])
+        for j, (i, lab) in enumerate(((IN2, "N$_2$"), (IAR, "Ar"), (IO2, "O$_2$"), (ICO2, "CO$_2$"), (IH2O, "H$_2$O"))):
+            yy = y + j * 26
+            ax.plot([xc - 6, xc + 16], [yy, yy], color=T[SPECIES[i]], lw=2.6 * self.s,
+                    ls=(0, (3.5, 2.2)) if i == IAR else "-", solid_capstyle="round")
+            self.text(fig, xc + 24, yy, lab, size=11, va="center", color=T["ink"])
 
     def _profiles(self, fig, fr):
         if self.L["prof"] == "per_bed_conc":
             for k in (0, 1):
                 self._conc_panel(fig, self.L["prof_boxes"][k], k, fr)
+            self._conc_legend(fig)
             return
         if self.L["prof"] == "per_bed_state":
             for k in (0, 1):
@@ -1431,8 +1514,7 @@ class Composer:
         a.set(xlim=(0, 1), ylim=(0, top), xticks=[0, 0.5, 1])
         a.text(1.02, mean, f"mean {mean:.2f}", fontsize=self.fs(10), color=T["ink2"], va="center",
                transform=a.get_yaxis_transform())
-        a.text(1.02, min(now, 0.92 * top), f"{now:.2f}", fontsize=self.fs(10), color=T["ink"], va="center",
-               fontweight="bold", transform=a.get_yaxis_transform())
+        self.text(fig, x1 - 80, y0, f"now {now:.2f} kW", size=12, ha="right", fontweight="bold")  # live value, fixed place
         a.grid(axis="x", visible=False)
         self._axis_style(a)
 
@@ -1480,7 +1562,7 @@ class Composer:
         tx = self.cfg.get("text", {})
         self.text(fig, x, y, tx.get("title", "PSA nitrogen generator"), size=26, fontweight="bold")
         self.text(fig, x, y + 40, tx.get("subtitle", ""), size=14.5, color=T["ink2"])
-        if "clock" in self.L:  # the cycle clock shows the time
+        if "clock" in self.L or self.L.get("pid") == "lport":  # no time line (user, v19 review: the cursor shows it)
             return
         self.text(fig, x, y + 64, f"t / t$_{{cycle}}$ = {fr['frac']:.3f}   (t$_{{cycle}}$ = {self.t_cycle:.0f} s)", size=13.5,
                   color=T["ink2"], family="DejaVu Sans Mono")

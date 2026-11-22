@@ -97,7 +97,7 @@ class Pipe:
 
 class PipeNet:
     def __init__(self, data, y_feed, weights, theme, scale, tube_w=12.0, spacing=13.0, vmax=260.0, f_ref=0.05,
-                 fps=30.0, p_ref=None, density_exponent=1.0):
+                 fps=30.0, p_ref=None, density_exponent=1.0, n2_scale=1.0, n2_alpha=0.95):
         self.d = data
         self.yf = np.asarray(y_feed, float)
         self.w = np.asarray(weights, float)
@@ -106,6 +106,7 @@ class PipeNet:
         self.tube_w, self.spacing, self.vmax, self.f_ref, self.fps = tube_w, spacing, vmax, f_ref, fps
         self.p_ref = p_ref if p_ref is not None else 8.5
         self.gamma = density_exponent
+        self.n2_scale, self.n2_alpha = n2_scale, n2_alpha
         self.pipes: list[Pipe] = []
         self.state = {}
 
@@ -219,9 +220,13 @@ class PipeNet:
             nrm = np.c_[-tan[:, 1], tan[:, 0]]
             xy = xy + nrm * lat[a:b, None]
             F = float(p.flow(fr))
-            alpha = 0.95 if abs(F) > 1e-5 else 0.45  # gas standing in a closed line drawn dimmer
-            ax.scatter(xy[:, 0], xy[:, 1], s=(DOT * self.s * 0.72) ** 2, c=[colors[i] for i in sp[a:b]],
-                       linewidths=0, alpha=alpha, zorder=z)
+            dim = 1.0 if abs(F) > 1e-5 else 0.47  # gas standing in a closed line drawn dimmer
+            spf = sp[a:b]
+            n2 = spf == IN2
+            for m, size, alpha, zz in ((n2, DOT * self.n2_scale, self.n2_alpha, z), (~n2, DOT * 1.08, 0.95, z + 0.05)):
+                if m.any():  # N2 smaller and softer underneath, the other species on top (user, v19 review)
+                    ax.scatter(xy[m, 0], xy[m, 1], s=(size * self.s * 0.72) ** 2, c=[colors[i] for i in spf[m]],
+                               linewidths=0, alpha=alpha * dim, zorder=zz)
 
     def draw_chevrons(self, ax, fr, z=3.5):
         """A small direction mark on each flowing pipe (for stills)."""
@@ -236,6 +241,6 @@ class PipeNet:
             t = tan[0] * (1 if F > 0 else -1)
             nrm = np.array([-t[1], t[0]])
             c = xy[0]
-            a = 0.62 * p.tube_w
-            tri = [c + t * a, c - t * a * 0.6 + nrm * a * 0.75, c - t * a * 0.6 - nrm * a * 0.75]
-            ax.add_patch(Polygon(tri, closed=True, fc=T["ink"], ec=T["bg"], lw=0.8 * self.s, alpha=0.9, zorder=z))
+            a = 0.42 * p.tube_w  # small and grey (user, v19 review): the moving dots carry the direction in the video
+            tri = [c + t * a, c - t * a * 0.6 + nrm * a * 0.7, c - t * a * 0.6 - nrm * a * 0.7]
+            ax.add_patch(Polygon(tri, closed=True, fc=T["muted"], ec="none", alpha=0.75, zorder=z))

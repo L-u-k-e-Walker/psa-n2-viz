@@ -125,6 +125,13 @@ class BedRenderer:
                               ao_samples=ao_samples, loading_strength=comp.cfg.get("beds", {}).get("loading_strength"))
         self.origins = [self.scene.origin_for(b) for b in self.boxes]
         self.colors = np.array([hex_rgb(THEMES[theme][s]) for s in SPECIES])
+        qn = comp.cfg.get("molecules", {}).get("quiet_n2", {})
+        self.r_scale = np.ones(len(SPECIES))
+        if qn:  # N2 smaller and lighter, so the other species stand out (user, v19 review)
+            i = SPECIES.index("N2")
+            self.r_scale[i] = float(qn.get("radius", 1.0))
+            lt = float(qn.get("lighten", 0.0))
+            self.colors[i] = (1 - lt) * self.colors[i] + lt * hex_rgb(THEMES[theme]["bg"])
         self.q_ref = cyc.pl.q_scale
         self.z = d["z"]
         self.mol = mol
@@ -139,7 +146,7 @@ class BedRenderer:
             q = fr[f"q{k}"]
             o0, o1 = self.mol[f"off{k}"][f], self.mol[f"off{k}"][f + 1]
             dots = dict(pos=self.mol[f"pos{k}"][o0:o1].astype(float), sp=self.mol[f"sp{k}"][o0:o1].astype(int),
-                        r=float(self.mol["r_dot"]))
+                        r=float(self.mol["r_dot"]), r_scale=self.r_scale)
             self.scene.set_state(q[1] / self.q_ref[1], q[4] / self.q_ref[4], self.z, mirror=(k == 1), dots=dots,
                                  colors=self.colors)
             tmp = Path(f"{tmp_stem}_bed{k}.png")

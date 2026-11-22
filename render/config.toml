@@ -3,13 +3,17 @@
 # that snapshot unchanged. Colours come from psan2viz/style.py (validated set, docs/MISSION.md).
 
 [text]
+font = "Inter"            # bundled in render/fonts (SIL OFL); user, v19 review
 title = "CONVENTIONAL CMS PSA N$_2$ GENERATOR"   # PSA, not VPSA: docs/RESEARCH_regeneration.md
-subtitle = "Two carbon-molecular-sieve beds at cyclic steady state"
-footnote = """Isothermal LDF model of both beds, the receiver and the valves, at cyclic steady state; \
-literature, fitted or assumed inputs, nothing measured. Not to scale: geometry, particle size, \
-molecule speed and trace-species counts."""
+subtitle = "30 SLPM N$_2$  ·  99.5 %  ·  from 7.5 barg air  ·  two CMS beds, 120 s cycle"   # spec line (user, v19 review)
+footnote = """Isothermal LDF model of both beds, the receiver and the valves, at cyclic steady state; literature, fitted \
+or assumed inputs, nothing measured.
+Not to scale: geometry, particle size, molecule speed and trace-species counts. Valve motion drawn over 0.3 s of \
+video (the model switches instantly)."""
 
 [layout]
+cards = true             # light rounded panel cards (user, v19 review)
+valve_motion_s = 0.3     # spools / slides glide over this much video (cosmetic; user, v19 review)
 option = "F"            # A..F; F = twin towers, L-port 3-way valves, outlet analyzers (user, v08 review)
 pressure_unit = "barg"  # barg | bara
 valve_style = "spool"   # layout F: ball | butterfly | spool | piston; spool (user, valve options review)
@@ -65,7 +69,12 @@ speed_gain = 4.0
 speed_max = 1.5
 jitter = 0.03
 
+# quieter N2 (user, v19 review): N2 is 80-99 % of every gas, so its dots are drawn smaller and lighter
+quiet_n2 = { radius = 0.72, lighten = 0.35 }
+
 [pipes]
+n2_dot_scale = 0.75       # N2 dots smaller and softer than the others (user, v19 review)
+n2_alpha = 0.55
 # gas dots in the piping (layout F): v = vmax tanh(sqrt((|F|/P) / (f_ref/P_feed))) px per video second, F the solver's
 # molar flow and P the line pressure (so the speed follows the actual volumetric flow)
 tube_px = 16.0

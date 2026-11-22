@@ -107,6 +107,17 @@ class ValveArt:
         """3-way valve: common port (the bed) to the inner or the outer line; open_side 'inner' | 'outer' | None."""
         getattr(self, f"_{self.style}_3")(x, y, common, inner, outer, open_side)
 
+    def three_way_at(self, x, y, common, inner, outer, open_side, pos):
+        """3-way valve with the spool at an intermediate position (spool style; others ignore pos)."""
+        if self.style == "spool":
+            return self._spool_3(x, y, common, inner, outer, open_side, pos=pos)
+        return self.three_way(x, y, common, inner, outer, open_side)
+
+    def two_way_at(self, x, y, open_, axis, pos):
+        if self.style == "spool":
+            return self._spool_2(x, y, bool(open_), np.array((1.0, 0.0) if axis == "h" else (0.0, 1.0)), pos=pos)
+        return self.two_way(x, y, open_, axis)
+
     def needle(self, x, y, axis):
         """Throttling (purge) valve, always open."""
         getattr(self, f"_{self.style}_n")(x, y, np.array((1.0, 0.0) if axis == "h" else (0.0, 1.0)))
@@ -190,7 +201,9 @@ class ValveArt:
     # and the outline are drawn over the gas.
     UNDER = 2.8
 
-    def _spool_3(self, x, y, common, inner, outer, open_side):
+    def _spool_3(self, x, y, common, inner, outer, open_side, pos=None):
+        """pos: spool position -1 (over the left port) .. +1 (over the right port), for the switching motion;
+        default: from open_side."""
         hl, hh = 27.0, 12.5  # half length along the inner-outer axis, half height
         if inner not in ("l", "r"):  # not used by the layouts (alternatives are horizontal)
             return self._ball_3(x, y, common, inner, outer, open_side)
@@ -198,17 +211,19 @@ class ValveArt:
         self._flanges(x, y, hl, [inner, outer])
         self._flanges(x, y, hh, [common])
         self._rrect(x - hl, y - hh, 2 * hl, 2 * hh, self.light, rad=5.0, z=self.UNDER)
-        if open_side:
-            shut = VEC[outer] if open_side == "inner" else VEC[inner]
-            sg = shut[0]
-            xa, xb = x + sg * 4.0, x + sg * (hl - 2.5)
-            self._rrect(min(xa, xb), y - hh + 2.5, abs(xb - xa), 2 * hh - 5.0, self.dark, rad=3.0, z=6.2)
+        if pos is None and open_side:
+            pos = (VEC[outer] if open_side == "inner" else VEC[inner])[0]
+        if pos is not None:
+            w = hl - 6.5
+            xc = x + float(pos) * (4.0 + 0.5 * w)
+            self._rrect(xc - 0.5 * w, y - hh + 2.5, w, 2 * hh - 5.0, self.dark, rad=3.0, z=6.2)
         self._rrect(x - hl, y - hh, 2 * hl, 2 * hh, "none", self.dark, 2.0, rad=5.0, z=6.3)
         # pilot on the side away from the bed
         pc = np.array([x, y]) - cvec * (hh + 4.5)
         self._rrect(pc[0] - 7.0, pc[1] - 3.5, 14.0, 7.0, self.mid, self.dark, 1.2, rad=2.0, z=6.1)
 
-    def _spool_2(self, x, y, open_, u):
+    def _spool_2(self, x, y, open_, u, pos=None):
+        """pos: slide position 0 (across the bore, shut) .. 1 (in its chamber, open), for the switching motion."""
         p = _perp(u)
         side = -np.abs(p) if abs(p[0]) > 0.5 else np.array([0.0, -1.0])  # chamber to the left / above
         hw = self.hb + 3.0
@@ -219,7 +234,8 @@ class ValveArt:
         a = side / np.linalg.norm(side)
         corners = [c - a * hw - u * half_t, c + a * (hw + ch) - u * half_t, c + a * (hw + ch) + u * half_t, c - a * hw + u * half_t]
         self._poly(corners, self.light, z=self.UNDER)
-        sc = c + a * (hw + ch * 0.5 + 1.0) if open_ else c
+        o_ = (1.0 if open_ else 0.0) if pos is None else float(pos)
+        sc = c + a * (hw + ch * 0.5 + 1.0) * o_
         sh = hw - 0.5
         blk = [sc - a * sh - u * (half_t - 3), sc + a * sh - u * (half_t - 3), sc + a * sh + u * (half_t - 3), sc - a * sh + u * (half_t - 3)]
         self._poly(blk, self.dark, z=6.2)

@@ -28,14 +28,14 @@ THEMES = {
         bg="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781", grid="#e1e0d9", axis="#c3c2b7",
         bare="#d8d4cb", metal="#9a9890", glass="#b9c6d2", highlight="#f0efec",
         bare_alumina="#eeebe4", tube_edge="#a9a79f", tube_fill="#ecebe6", tube_shine="#ffffff",
-        valve_dark="#4f4d49", valve_mid="#b9b6ad",
+        valve_dark="#4f4d49", valve_mid="#b9b6ad", card="#f4f3ef",
         N2="#1baf7a", O2="#eb6834", Ar="#006644", H2O="#2a78d6", CO2="#0b0b0b",
     ),
     "dark": dict(
         bg="#1a1a19", ink="#f0efec", ink2="#c3c2b7", muted="#898781", grid="#2c2c2a", axis="#383835",
         bare="#4a4945", metal="#6d6b66", glass="#5d6b78", highlight="#2c2c2a",
         bare_alumina="#6b6964", tube_edge="#5a5853", tube_fill="#262624", tube_shine="#77756f",
-        valve_dark="#cfcdc6", valve_mid="#77756f",
+        valve_dark="#cfcdc6", valve_mid="#77756f", card="#222220",
         N2="#199e70", O2="#d95926", Ar="#6adeac", H2O="#3987e5", CO2="#f0efec",
     ),
 }
@@ -125,12 +125,15 @@ def apply_ramp(r, x):
     return r[i0] * (1 - w) + r[i1] * w
 
 
-def mpl_rc(theme, scale=1.0):
-    """matplotlib rc for a theme (psa-viz original; ``scale`` added for the 960x540 mock/draft tiers)."""
+def mpl_rc(theme, scale=1.0, family="DejaVu Sans"):
+    """matplotlib rc for a theme (psa-viz original; ``scale`` added for the 960x540 mock/draft tiers, ``family``
+    for the typeface: maths text (subscripts) uses the same face)."""
     t = THEMES[theme]
     s = scale
     return {
-        "font.family": "DejaVu Sans", "font.size": 15 * s,
+        "font.family": family, "font.size": 15 * s,
+        "mathtext.fontset": "custom", "mathtext.rm": family, "mathtext.it": f"{family}:italic",
+        "mathtext.bf": f"{family}:bold", "mathtext.sf": family,
         "text.color": t["ink"], "axes.labelcolor": t["ink2"], "axes.edgecolor": t["axis"],
         "xtick.color": t["muted"], "ytick.color": t["muted"], "axes.facecolor": t["bg"],
         "figure.facecolor": t["bg"], "savefig.facecolor": t["bg"], "axes.grid": True,
