@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from pipes import PipeNet, _mix  # noqa: E402
 from valves import STYLES as VALVE_STYLES, ValveArt  # noqa: E402
+from psan2viz.performance import performance  # noqa: E402
 from psan2viz.style import SPECIES, SPECIES_ROLE, SPECIES_TEX, THEMES, apply_ramp, loading_ramp, mpl_rc  # noqa: E402
 
 W, H = 1920, 1080
@@ -72,15 +73,15 @@ LAYOUTS = {
         timing=(1330, 52, 1890, 300), pressure=(1330, 352, 1890, 488), o2=(1330, 540, 1890, 656),
         readouts=(1330, 696), footnote=(36, 1072)),
     "F": dict(  # twin towers, L-port 3-way valves (bed on the common port, alternatives opposite), outlet analyzers
-        name="twin towers, L-port 3-way valves", pid="lport", title=(36, 24), legend=(1330, 866),
-        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_state", label_side=["left", "right"], label_dy=30,
-        prof_boxes=[(380, 344, 600, 744), (720, 344, 940, 744)],
+        name="twin towers, L-port 3-way valves", pid="lport", title=(36, 24), legend=(1330, 892),
+        beds=[(200, 344, 310, 744), (1010, 344, 1120, 744)], prof="per_bed_conc", label_side=["left", "right"], label_dy=30,
+        prof_boxes=[(405, 344, 600, 744), (745, 344, 940, 744)],
         v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
         analyzer_w=172, analyzer_h=72, analyzer_gap=52,
         timing=(1330, 52, 1890, 330), pressure=(1330, 396, 1890, 636),  # no product-O2 panel (user, v10 review)
-        readouts=(1330, 690), footnote=(36, 1072)),
+        readouts=(1330, 664), footnote=(36, 1072)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -1140,9 +1141,9 @@ class Composer:
         x, y = box[0], box[1] - 30
         if title:
             self.text(fig, x, y - 2, title, size=12, fontweight="bold")
-            x += 62
+            x += 54
         for j, i in enumerate((IN2, IO2, IAR, ICO2, IH2O)):
-            xx = x + j * 44
+            xx = x + j * 39
             fig.lines.append(plt.Line2D([self.fx(xx + 5)], [self.fy(y + 8)], marker="o", ms=6 * self.s,
                                         color=T[SPECIES[i]], mec=T["bg"], transform=fig.transFigure, figure=fig))
             self.text(fig, xx + 12, y, SPECIES_TEX[SPECIES[i]], size=10.5, color=T["ink2"])
@@ -1217,7 +1218,35 @@ class Composer:
                                         mec=T["bg"], transform=fig.transFigure, figure=fig))
             self.text(fig, xx + 10, y0 - 13, lab, size=9, color=T["ink2"])
 
+    def _conc_panel(self, fig, box, k, fr):
+        """One chart per bed (user, 2026-11-22): the gas concentration of every species along the whole bed
+        (alumina + CMS), normalized by its feed concentration, C_i / C_i,in (C_i,in = y_i,feed p_feed / RT)."""
+        T = self.T
+        pl = self.cyc.pl
+        c_in = pl.yf * (float(pl.case.p_feed) * 1e5 / pl.RT)  # mol/m3 of each species in the feed
+        c = fr[f"y{k}"] * fr[f"C{k}"][None, :]
+        a = self.box_axes(fig, box)
+        a.axhspan(0, self.z_al, color=T["highlight"], lw=0, zorder=0)
+        a.axvline(1.0, color=T["muted"], lw=1.0 * self.s, ls=(0, (3, 3)), zorder=1)
+        a.plot(c[IAR] / c_in[IAR], self.z, color=T["Ar"], lw=1.8 * self.s, ls=(0, (4, 2.5)), zorder=3)  # Ar follows N2: dashed
+        for i in (IN2, IO2, ICO2, IH2O):
+            a.plot(c[i] / c_in[i], self.z, color=T[SPECIES[i]], lw=2.3 * self.s, zorder=4 if i == IN2 else 3)
+        a.set(xlim=(0, 1.3), ylim=(0, 1), xticks=[0, 0.5, 1.0], yticks=[0, 0.5, 1])
+        a.set_xticklabels(["0", "0.5", "1"])
+        a.set_ylabel("height  z / L", fontsize=self.fs(11))
+        a.set_xlabel("C / C$_{in}$  (feed = 1)", fontsize=self.fs(11))
+        self._axis_style(a)
+        a.text(0.98, 0.5 * self.z_al, "alumina", transform=a.get_yaxis_transform(), ha="right", va="center",
+               fontsize=self.fs(9), color=T["ink2"])
+        a.text(0.98, self.z_al + 0.02, "CMS", transform=a.get_yaxis_transform(), ha="right", va="bottom",
+               fontsize=self.fs(9), color=T["ink2"])
+        self._species_key(fig, box, title=f"Bed {k + 1}")
+
     def _profiles(self, fig, fr):
+        if self.L["prof"] == "per_bed_conc":
+            for k in (0, 1):
+                self._conc_panel(fig, self.L["prof_boxes"][k], k, fr)
+            return
         if self.L["prof"] == "per_bed_state":
             for k in (0, 1):
                 self._bed_state_panel(fig, self.L["prof_boxes"][k], k, fr)
@@ -1348,22 +1377,29 @@ class Composer:
         self._axis_style(a)
 
     def _readouts(self, fig, fr):
+        """Product and energy readouts, in SLPM and litres (user, 2026-11-22), from psan2viz.performance."""
         T, m = self.T, self.met
         x, y = self.L["readouts"]
         yT = fr["y_tank"]
         o2 = 1e6 * yT[IO2]
+        pf = performance(m, self.cyc.pl.case)
         rows = [
+            ("product", f"{pf['product_slpm']:.1f} SLPM N$_2$ at {self.p_disp(float(self.cyc.pl.case.p_deliver)):.1f} barg"),
             ("O$_2$", f"{o2:,.0f} ppm   (spec ≤ 5,000)"),
-            ("purity", f"{100 * (1 - yT[IO2]):.2f} % N$_2$ + Ar"),
-            ("N$_2$ only", f"{100 * yT[IN2]:.2f} %   (Ar {100 * yT[IAR]:.2f} %)"),
+            ("purity", f"{100 * (1 - yT[IO2]):.2f} % N$_2$ + Ar   (N$_2$ {100 * yT[IN2]:.2f} %, Ar {100 * yT[IAR]:.2f} %)"),
             ("CO$_2$, H$_2$O", f"{1e6 * yT[ICO2]:.2g} ppm, {1e6 * yT[IH2O]:.2g} ppm"),
-            ("recovery", f"N$_2$ {100 * m['recovery_N2']:.1f} %,   air factor {m['air_factor']:.2f}"),
-            ("productivity", f"{m['productivity_Nm3_h_m3']:.0f} Nm$^3$/h per m$^3$ CMS"),
+            ("feed air", f"{pf['feed_air_slpm']:.0f} SLPM at {pf['p_header_barg']:.1f} barg   (air factor {pf['air_factor']:.2f})"),
+            ("recovery", f"N$_2$ {100 * m['recovery_N2']:.1f} %"),
+            ("pressure work", f"{pf['pressure_work_w']:.0f} W  =  {pf['specific_wh_per_l']:.3f} Wh per L N$_2$"),
+            ("", "ideal isothermal compression of the feed air"),
+            ("productivity", f"{pf['productivity_slpm_per_l_cms']:.2f} SLPM per L of CMS"),
         ]
-        self.text(fig, x, y, "Product 30 SLPM (21.1 °C, 1 atm)", size=13, fontweight="bold")
+        self.text(fig, x, y, "Product and energy (SLPM at 21.1 °C, 1 atm)", size=13, fontweight="bold")
         for i, (k, v) in enumerate(rows):
-            self.text(fig, x, y + 28 + i * 21, k, size=11.5, color=T["ink2"])
-            self.text(fig, x + 118, y + 28 + i * 21, v, size=11.5)
+            small = k == ""
+            self.text(fig, x, y + 28 + i * 20, k, size=11.5, color=T["ink2"])
+            self.text(fig, x + 128, y + 28 + i * 20 - (3 if small else 0), v, size=9.5 if small else 11.5,
+                      color=T["muted"] if small else T["ink"])
 
     def _legend(self, fig):
         T = self.T
@@ -1376,9 +1412,9 @@ class Composer:
         yr = y + 5 * 20 + 6
         for j, (rmp, lab) in enumerate(((self.ramp_cms, "CMS: O$_2$ held, q / q$_{feed}$"),
                                         (self.ramp_al, "alumina: H$_2$O held, q / q$_{feed}$"))):
-            xx, yy = x, yr + j * 40
+            xx, yy = x + j * 290, yr  # the two bed-colour keys side by side
             self.text(fig, xx, yy, lab, size=10, color=T["ink2"])
-            ax = fig.add_axes([self.fx(xx + 200), self.fy(yy + 12), 90 / W, 9 / H])
+            ax = fig.add_axes([self.fx(xx + 4), self.fy(yy + 30), 150 / W, 9 / H])
             ax.imshow(rmp[None], aspect="auto", extent=(0, 1, 0, 1))
             ax.set_xticks([0, 1])
             ax.set_yticks([])

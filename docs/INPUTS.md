@@ -81,3 +81,19 @@ The full table with values and sources is generated from the final state: docs/D
 | Delivery pressure | 6.0 barg | assumed | regulator about 1.5 bar below the inlet |
 | Grid | 30 alumina + 180 CMS cells, first-order upwind | user decision | checked against 60 + 360 (G1e); 60 cells over-predicts product O2 ~3.5x at the same bed |
 
+
+## Rates and energy shown in the visual (psan2viz/performance.py)
+
+Units: litres and SLPM throughout (user, 2026-11-22); SLPM at 21.1 degC and 1 atm (24.145 L/mol), the user's
+standard for the 30 SLPM product.
+
+| Quantity | Definition | Source class |
+|---|---|---|
+| Product rate | delivered product flow of the CSS cycle, in SLPM | computed (the 30 SLPM is the user's spec) |
+| Feed air | air drawn from the feed header per cycle, in SLPM; air factor = feed air / product | computed |
+| Pressure work | ideal isothermal compression of that feed air from 1 atm to the 7.5 barg header at the model temperature (20 degC): W = n_feed R T ln(p_header / p_atm); also per litre of product (Wh per L N2) | calculated; the thermodynamic minimum, a real compressor needs more (adiabatic losses, motor and drive efficiency), not estimated |
+| Productivity | product SLPM per litre of CMS in both beds | computed |
+
+The center charts show the gas concentration of each species along the whole bed, normalized by its feed
+concentration: C_i / C_i,in with C_i,in = y_i,feed p_feed / (R T). Values above 1 occur for N2 (and Ar) near
+the product end, where the gas is enriched in N2 at nearly the feed pressure.

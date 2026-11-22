@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from psan2viz import css  # noqa: E402
+from psan2viz.performance import performance  # noqa: E402
 
 src = (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "model" / "css" / "final").resolve()
 case, pl, x = css.load(src)
@@ -38,14 +39,17 @@ rows = [
     ("Delivery pressure", f"{case.p_deliver - 1.01325:.2f} barg", prov["p_deliver"]),
     ("Grid", f"{a['n_al']} alumina + {a['n_cms']} CMS cells", prov["grid"]),
 ]
+pf = performance(met, case)
 perf = [
+    ("Product rate", f"{pf['product_slpm']:.1f} SLPM N2 (21.1 degC, 1 atm)"),
     ("Product O2", f"{met['product_O2_ppm']:,.0f} ppm (spec <= 5,000)"),
     ("Purity, N2 + Ar (industry)", f"{met['purity_N2_plus_Ar_pct']:.2f} %"),
     ("N2 excluding Ar", f"{met['N2_excl_Ar_pct']:.2f} % (Ar {met['product_Ar_pct']:.2f} %)"),
     ("Product CO2, H2O", f"{met['product_CO2_ppm']:.2g} ppm, {met['product_H2O_ppm']:.2g} ppm"),
     ("N2 recovery", f"{100 * met['recovery_N2']:.1f} %"),
-    ("Air factor (feed air / product)", f"{met['air_factor']:.2f}"),
-    ("Productivity", f"{met['productivity_Nm3_h_m3']:.0f} Nm3/h per m3 CMS"),
+    ("Feed air", f"{pf['feed_air_slpm']:.0f} SLPM at {pf['p_header_barg']:.1f} barg (air factor {pf['air_factor']:.2f})"),
+    ("Pressure work (ideal isothermal compression of the feed air)", f"{pf['pressure_work_w']:.0f} W = {pf['specific_wh_per_l']:.3f} Wh per L N2"),
+    ("Productivity", f"{pf['productivity_slpm_per_l_cms']:.2f} SLPM per L of CMS ({pf['cms_l_both_beds']:.1f} L CMS in both beds)"),
     ("Purge / product", f"{met['purge_to_product']:.3f}"),
     ("CSS change of one full cycle", f"{met['css_change_rms']:.1e} rms, {met['css_change_max']:.1e} max (normalized)"),
 ]
