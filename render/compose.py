@@ -83,14 +83,15 @@ LAYOUTS = {
         prof_boxes=[(405, 344, 600, 744), (745, 344, 940, 744)],
         v3_top_y=284, purge_y=226, recv_line_y=144, v3_bot_y=832, vent_y=900, feed_out_y=978, vent_out_y=1024,
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
-        train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
+        train_x=96, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
         analyzer_w=172, analyzer_h=72, analyzer_gap=52,
-        timing=(1330, 50, 1890, 262), pressure=(1330, 326, 1890, 456),  # no product-O2 panel (user, v10 review)
-        power=(1330, 506, 1890, 640),  # feed-compressor power over the cycle (user, v18 review)
-        heat=(1330, 690, 1890, 824),  # heat of adsorption / desorption per bed (user, v20 review)
-        readouts=(1330, 872), footnote=(36, 1072), colour_keys=(20, 560),
-        cards=[(1316, 38, 1904, 308), (1316, 316, 1904, 484), (1316, 492, 1904, 668), (1316, 676, 1904, 852),
-               (1316, 860, 1904, 1044), (336, 296, 968, 802)]),  # light panel cards (user, v19 review)
+        # right column: five cards, 10 px apart, each chart 14 px below its card top (user, v22 review)
+        timing=(1330, 50, 1890, 248), pressure=(1330, 312, 1890, 456),  # no product-O2 panel (user, v10 review)
+        power=(1330, 498, 1890, 644),  # feed-compressor power over the cycle (user, v18 review)
+        heat=(1330, 686, 1890, 832),  # heat of adsorption / desorption per bed (user, v20 review)
+        readouts=(1330, 880), footnote=(36, 1072), colour_keys=(20, 560),
+        cards=[(1316, 38, 1904, 290), (1316, 300, 1904, 476), (1316, 486, 1904, 664), (1316, 674, 1904, 852),
+               (1316, 862, 1904, 1040), (336, 296, 968, 802)]),  # light panel cards (user, v19 review)
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -865,6 +866,7 @@ class Composer:
                 lambda fr, F: _mix([(pos(-fr["F0_vent"]), bot(fr, 0)), (pos(-fr["F1_vent"]), bot(fr, 1))], bot(fr, 0)) if F > 0 else bot(fr, 0), pressure=ventP)
         for i, pts in enumerate([[(tx + 48, fo), (tx + 64, fo)], [(tx + 90, fo), (tx + 100, fo)], [(tx + 152, fo), (x_in, fo)]]):
             net.add(f"train_{i}", pts, lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, gas=False)
+        net.add("intake", [(22, fo), (tx, fo)], lambda d: 0.0 * d["F0_feed"], lambda fr, F: None, gas=False)  # air at 1 atm
         # straight sample taps to the outlet analyzers
         aw, ah, ag = L["analyzer_w"], L["analyzer_h"], L["analyzer_gap"]
         y_taps = [y_tops[k] - 10 for k in (0, 1)]
@@ -1038,10 +1040,10 @@ class Composer:
         self._compressor(ax, tx + 24, fo)
         self._vessel(ax, tx + 77, fo - 45, 26, 70, None)
         self._box_icon(ax, tx + 100, fo - 20, 52, 40, "dryer", small=True)
-        self.text(fig, tx, fo + 34, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
+        self.text(fig, 22, fo - 44, "air intake, 1 atm", size=10, color=T["ink2"])
+        self.text(fig, 22, fo + 34, "compressor, air receiver, dryer · 7.5 barg, dew point +3 °C (context only)",
                   size=10, color=T["muted"])
-        self._box_icon(ax, g["sx"], vo - 15, 56, 30, "silencer", small=True)
-        self.text(fig, g["sx"] + 64, vo - 9, "vent", size=11, color=T["muted"])
+        self.text(fig, g["sx"] + 12, vo - 9, "vent, 1 atm", size=11, color=T["ink2"])  # open end to atmosphere
         rx0, ry0, rx1, ry1 = g["receiver"]
         self._vessel(ax, g["rcx"], ry0, rx1 - rx0, ry1 - ry0, "N$_2$ receiver")
         va.regulator(g["rcx"], ry1 + 30, "v")
@@ -1479,7 +1481,6 @@ class Composer:
             ("product", f"{pf['product_slpm']:.1f} SLPM N$_2$ at {self.p_disp(float(self.cyc.pl.case.p_deliver)):.1f} barg"),
             ("O$_2$", f"{o2:,.0f} ppm   (spec ≤ 5,000)"),
             ("purity", f"{100 * (1 - yT[IO2]):.2f} % N$_2$ + Ar   (N$_2$ {100 * yT[IN2]:.2f} %, Ar {100 * yT[IAR]:.2f} %)"),
-            ("CO$_2$, H$_2$O", f"{1e6 * yT[ICO2]:.2g} ppm, {1e6 * yT[IH2O]:.2g} ppm"),
             ("feed air", f"{pf['feed_air_slpm']:.0f} SLPM at {pf['p_header_barg']:.1f} barg   (air factor {pf['air_factor']:.2f})"),
             ("recovery", f"N$_2$ {100 * m['recovery_N2']:.1f} %"),
             ("pressure work", f"{pf['pressure_work_w']:.0f} W  =  {pf['specific_wh_per_l']:.3f} Wh per L N$_2$   (ideal isothermal)"),
@@ -1488,8 +1489,8 @@ class Composer:
         self.text(fig, x, y, "Product and energy (SLPM at 21.1 °C, 1 atm)", size=13, fontweight="bold")
         for i, (k, v) in enumerate(rows):
             small = k == ""
-            self.text(fig, x, y + 27 + i * 18, k, size=11.5, color=T["ink2"])
-            self.text(fig, x + 128, y + 27 + i * 18 - (3 if small else 0), v, size=9.5 if small else 11.5,
+            self.text(fig, x, y + 28 + i * 19, k, size=11.5, color=T["ink2"])
+            self.text(fig, x + 128, y + 28 + i * 19 - (3 if small else 0), v, size=9.5 if small else 11.5,
                       color=T["muted"] if small else T["ink"])
 
     def _power(self, fig, fr):
@@ -1543,19 +1544,11 @@ class Composer:
         tc = float(fr["t_cycle"])
         n0, n1 = (float(np.interp(tc, d["heat_t"], h)) for h in (h0, h1))
         a.plot([fr["frac"]] * 2, [n0, n1], "o", ms=5.5 * self.s, color=T["ink"], mec=T["bg"], mew=1.0 * self.s)
-        # the start-of-step spikes (~10 kW for a moment) would flatten everything else: the axis covers the
-        # ordinary dynamics (97th percentile of |heat|) and the peaks are printed
-        both = np.concatenate([h0, h1])
-        wt = np.gradient(d["heat_t"])  # time weights (the samples are dense at each step start)
-        av = np.abs(both)
-        order = np.argsort(av)
-        cw = np.cumsum(np.concatenate([wt, wt])[order])
-        lim = 1.35 * float(av[order][np.searchsorted(cw, 0.97 * cw[-1])])
-        hi_pk, lo_pk = float(both.max()), float(both.min())
-        a.set(xlim=(0, 1), ylim=(-lim, lim), xticks=[0, 0.5, 1])
-        lo, hi = -lim, lim
-        a.text(0.995, 0.97, f"peaks {hi_pk:+.1f} / {lo_pk:+.1f} kW (off scale)", transform=a.transAxes, ha="right",
-               va="top", fontsize=self.fs(9), color=T["muted"])
+        # full range (user, v22 review: nothing off the chart)
+        lo, hi = float(min(h0.min(), h1.min())), float(max(h0.max(), h1.max()))
+        pad = 0.06 * (hi - lo)
+        lo, hi = lo - pad, hi + pad
+        a.set(xlim=(0, 1), ylim=(lo, hi), xticks=[0, 0.5, 1])
         for lab, yl in zip(("bed 1", "bed 2"), spread([float(np.clip(h0[-1], lo, hi)), float(np.clip(h1[-1], lo, hi))], 0.18 * (hi - lo))):
             a.text(1.02, yl, lab, fontsize=self.fs(10), color=T["ink2"], va="center", transform=a.get_yaxis_transform())
         a.grid(axis="x", visible=False)
@@ -1566,7 +1559,7 @@ class Composer:
         """The bed-colour keys (loading ramps) at the left edge."""
         T = self.T
         x, y = self.L["colour_keys"]
-        self.text(fig, x, y, "bed colours", size=10.5, fontweight="bold", color=T["ink2"])
+        self.text(fig, x, y, "bed colors", size=10.5, fontweight="bold", color=T["ink2"])
         for j, (rmp, lab) in enumerate(((self.ramp_cms, "CMS: O$_2$ held"), (self.ramp_al, "alumina: H$_2$O held"))):
             yy = y + 24 + j * 52
             self.text(fig, x, yy, lab, size=10, color=T["ink2"])
