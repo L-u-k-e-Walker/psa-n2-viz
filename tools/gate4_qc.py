@@ -32,7 +32,10 @@ def probe(path):
 
 res, ok = {}, True
 for theme in tier["themes"]:
-    n_png = len(list((ROOT / "frames" / f"{info['config_hash']}_final_{theme}").glob("f_*.png")))
+    fdir = ROOT / "frames" / f"{info['version']}_{info['config_hash']}_final_{theme}"  # frame folders carry the version
+    if not fdir.exists():
+        fdir = ROOT / "frames" / f"{info['config_hash']}_final_{theme}"  # older renders
+    n_png = len(list(fdir.glob("f_*.png")))
     for ext in ("mp4", "gif"):
         p = FINAL / f"psa_n2_{theme}.{ext}"
         if not p.exists():

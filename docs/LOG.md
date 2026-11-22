@@ -335,3 +335,15 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   at the O2 front: Ar is modelled with O2's equilibrium but N2's slow kinetics, so when the CMS strips O2 fast, the
   Ar is left in the gas and enriches just ahead of the front (like N2), while the gas above it came in from the top
   with the product back-flow (~1.2 % Ar).
+
+## Phase 4: final render (2026-11-22)
+- User: "im ready for a full resolution render. final v24". v24 = v23's config (render/config.toml unchanged since v23,
+  snapshot copied to previews/v24) at final quality; REVIEWS row "approved: final v24" records the user's words.
+- render.py --final v24 --css model/css/final --workers 4: 1800 frames, Tachyon with ambient occlusion, white;
+  690 s frames, 738 s in all. Outputs final/psa_n2_white.mp4 (1920x1080, 30 fps, 60.0 s, H.264 yuv420p, 20.8 MB) and
+  final/psa_n2_white.gif (1280x720 at 15 fps, 60.0 s, 39.0 MB: 1920 px would exceed the 50 MB limit).
+- **Gate 4 PASS** (tools/gate4_qc.py -> docs/gate4_qc.json): size, frame count, duration, codec, pixel format, all PNG
+  frames present; GIF aspect, duration, under the limit. (The gate looked for the old frame folder name; fixed to the
+  versioned folders.)
+- The Phase 1 gate run on the 360-cell final (gates_phase1.py) was killed after 6 h (signal 9, most likely memory while
+  render workers ran beside it); the gates and Gate 3 still need a run on their own.

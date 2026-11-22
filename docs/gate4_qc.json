@@ -1,0 +1,39 @@
+{
+ "psa_n2_white.mp4": {
+  "width": 1920,
+  "height": 1080,
+  "frames": 1800,
+  "codec": "h264",
+  "pix_fmt": "yuv420p",
+  "fps": 30.0,
+  "duration_s": 60.0,
+  "size_MB": 20.8,
+  "checks": {
+   "size": true,
+   "frames": true,
+   "duration": true,
+   "h264": true,
+   "yuv420p": true,
+   "all_png_frames": true
+  }
+ },
+ "psa_n2_white.gif": {
+  "width": 1280,
+  "height": 720,
+  "frames": 900,
+  "codec": "gif",
+  "pix_fmt": "bgra",
+  "fps": 15.0,
+  "duration_s": 60.0,
+  "size_MB": 39.03,
+  "downscaled": true,
+  "note": "GIF downscaled to 1280 px wide (39.0 MB; 1920 px would exceed 50 MB)",
+  "checks": {
+   "aspect": true,
+   "duration": true,
+   "under_limit": true
+  }
+ },
+ "labels": "legend rows name each species and its role (psan2viz.style.SPECIES_ROLE): N2/Ar product, O2/CO2/H2O extract",
+ "pass": true
+}
