@@ -1489,7 +1489,7 @@ class Composer:
         for i, (k, v) in enumerate(rows):
             small = k == ""
             self.text(fig, x, y + 27 + i * 18, k, size=11.5, color=T["ink2"])
-            self.text(fig, x + 128, y + 28 + i * 19 - (3 if small else 0), v, size=9.5 if small else 11.5,
+            self.text(fig, x + 128, y + 27 + i * 18 - (3 if small else 0), v, size=9.5 if small else 11.5,
                       color=T["muted"] if small else T["ink"])
 
     def _power(self, fig, fr):
