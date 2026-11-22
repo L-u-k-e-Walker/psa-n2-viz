@@ -59,8 +59,17 @@ if not (final / "metrics.json").exists():
     while not (src / "metrics.json").exists():
         time.sleep(60)
     log(f"final source: 360-cell state {src}")
-    run(PY + [HERE / "css" / "trace_css.py", src, final, "--tol", "1e-6", "--rtol", "1e-7", "--march-max", "3000", "--accel"],
-        HERE / "css")
+    # frozen-bulk trace cycles cost ~56 s at 360 cells (~2 s at 180), so the slow trace profiles are converged
+    # at 180 cells on the same beds, carried onto the 360-cell state, and finished there with short marches
+    t180 = HERE / "css" / "trace180"
+    if not (t180 / "metrics.json").exists():
+        run(PY + [HERE / "css" / "trace_css.py", HERE / "sizing" / "runs_n180b" / "iter02", t180, "--tol", "1e-6",
+                  "--rtol", "1e-7", "--march-max", "3000", "--accel"], HERE / "css")
+    warm = HERE / "css" / "final_start_360.npy"
+    if not warm.exists():
+        run(PY + [HERE / "transfer_trace.py", t180, src, warm], ROOT)
+    run(PY + [HERE / "css" / "trace_css.py", src, final, "--warm", warm, "--tol", "1e-6", "--rtol", "1e-7",
+              "--march-max", "150", "--full", "2", "--outer-max", "4", "--accel"], HERE / "css")
 met = json.loads((final / "metrics.json").read_text())
 log(f"final state: O2 {met['product_O2_ppm']:.0f} ppm, CSS change rms {met['css_change_rms']:.2e}, converged {met['converged']}")
 
