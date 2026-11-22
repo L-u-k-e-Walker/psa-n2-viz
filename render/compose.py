@@ -85,11 +85,12 @@ LAYOUTS = {
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
         analyzer_w=172, analyzer_h=72, analyzer_gap=52,
-        timing=(1330, 52, 1890, 330), pressure=(1330, 404, 1890, 562),  # no product-O2 panel (user, v10 review)
-        power=(1330, 612, 1890, 772),  # feed-compressor power over the cycle (user, v18 review)
-        readouts=(1330, 822), footnote=(36, 1072), colour_keys=(20, 560),
-        cards=[(1316, 40, 1904, 384), (1316, 392, 1904, 594), (1316, 602, 1904, 804), (1316, 812, 1904, 1030),
-               (336, 296, 968, 802)]),  # light panel cards (user, v19 review)
+        timing=(1330, 50, 1890, 262), pressure=(1330, 326, 1890, 456),  # no product-O2 panel (user, v10 review)
+        power=(1330, 506, 1890, 640),  # feed-compressor power over the cycle (user, v18 review)
+        heat=(1330, 690, 1890, 824),  # heat of adsorption / desorption per bed (user, v20 review)
+        readouts=(1330, 872), footnote=(36, 1072), colour_keys=(20, 560),
+        cards=[(1316, 38, 1904, 308), (1316, 316, 1904, 484), (1316, 492, 1904, 668), (1316, 676, 1904, 852),
+               (1316, 860, 1904, 1044), (336, 296, 968, 802)]),  # light panel cards (user, v19 review)
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -224,6 +225,8 @@ class Composer:
             self._readouts(fig, fr)
             if "power" in self.L:
                 self._power(fig, fr)
+            if "heat" in self.L:
+                self._heat(fig, fr)
             if "colour_keys" in self.L:
                 self._colour_keys(fig)
             else:
@@ -1479,14 +1482,13 @@ class Composer:
             ("CO$_2$, H$_2$O", f"{1e6 * yT[ICO2]:.2g} ppm, {1e6 * yT[IH2O]:.2g} ppm"),
             ("feed air", f"{pf['feed_air_slpm']:.0f} SLPM at {pf['p_header_barg']:.1f} barg   (air factor {pf['air_factor']:.2f})"),
             ("recovery", f"N$_2$ {100 * m['recovery_N2']:.1f} %"),
-            ("pressure work", f"{pf['pressure_work_w']:.0f} W  =  {pf['specific_wh_per_l']:.3f} Wh per L N$_2$"),
-            ("", "ideal isothermal compression of the feed air"),
+            ("pressure work", f"{pf['pressure_work_w']:.0f} W  =  {pf['specific_wh_per_l']:.3f} Wh per L N$_2$   (ideal isothermal)"),
             ("productivity", f"{pf['productivity_slpm_per_l_cms']:.2f} SLPM per L of CMS"),
         ]
         self.text(fig, x, y, "Product and energy (SLPM at 21.1 °C, 1 atm)", size=13, fontweight="bold")
         for i, (k, v) in enumerate(rows):
             small = k == ""
-            self.text(fig, x, y + 28 + i * 19, k, size=11.5, color=T["ink2"])
+            self.text(fig, x, y + 27 + i * 18, k, size=11.5, color=T["ink2"])
             self.text(fig, x + 128, y + 28 + i * 19 - (3 if small else 0), v, size=9.5 if small else 11.5,
                       color=T["muted"] if small else T["ink"])
 
@@ -1517,6 +1519,48 @@ class Composer:
         self.text(fig, x1 - 80, y0, f"now {now:.2f} kW", size=12, ha="right", fontweight="bold")  # live value, fixed place
         a.grid(axis="x", visible=False)
         self._axis_style(a)
+
+    def _heat(self, fig, fr):
+        """Heat of adsorption (released, > 0) and desorption (taken up, < 0) of each bed over the cycle (user,
+        v20 review), from the isothermal solution (psan2viz.thermal); live values in the title row."""
+        T = self.T
+        x0, y0, x1, y1 = self.L["heat"]
+        d = self.d
+        if "heat_t" not in d:
+            return
+        a = self.box_axes(fig, (x0 + 40, y0 + 44, x1 - 80, y1))
+        tt = d["heat_t"] / self.t_cycle
+        h0, h1 = d["heat0"] / 1000.0, d["heat1"] / 1000.0
+        # adiabatic estimate: range of the cumulative heat over the cycle / sorbent heat capacity
+        e = np.concatenate([[0.0], np.cumsum(0.5 * (d["heat0"][1:] + d["heat0"][:-1]) * np.diff(d["heat_t"]))])
+        swing = float(e.max() - e.min()) / float(d["heat_cap"])
+        self.text(fig, x0, y0, "Heat of adsorption (kW)", size=13, fontweight="bold")
+        self.text(fig, x0, y0 + 21, f"+ released on uptake, − taken up on release; an uncooled bed would swing ±{0.5 * swing:.1f} K",
+                  size=10, color=T["muted"])
+        a.axhline(0, color=T["axis"], lw=1.0 * self.s)
+        a.plot(tt, h0, color=T["ink"], lw=1.5 * self.s)
+        a.plot(tt, h1, color=T["ink2"], lw=1.5 * self.s, ls=(0, (4, 2.5)))
+        tc = float(fr["t_cycle"])
+        n0, n1 = (float(np.interp(tc, d["heat_t"], h)) for h in (h0, h1))
+        a.plot([fr["frac"]] * 2, [n0, n1], "o", ms=5.5 * self.s, color=T["ink"], mec=T["bg"], mew=1.0 * self.s)
+        # the start-of-step spikes (~10 kW for a moment) would flatten everything else: the axis covers the
+        # ordinary dynamics (97th percentile of |heat|) and the peaks are printed
+        both = np.concatenate([h0, h1])
+        wt = np.gradient(d["heat_t"])  # time weights (the samples are dense at each step start)
+        av = np.abs(both)
+        order = np.argsort(av)
+        cw = np.cumsum(np.concatenate([wt, wt])[order])
+        lim = 1.35 * float(av[order][np.searchsorted(cw, 0.97 * cw[-1])])
+        hi_pk, lo_pk = float(both.max()), float(both.min())
+        a.set(xlim=(0, 1), ylim=(-lim, lim), xticks=[0, 0.5, 1])
+        lo, hi = -lim, lim
+        a.text(0.995, 0.97, f"peaks {hi_pk:+.1f} / {lo_pk:+.1f} kW (off scale)", transform=a.transAxes, ha="right",
+               va="top", fontsize=self.fs(9), color=T["muted"])
+        for lab, yl in zip(("bed 1", "bed 2"), spread([float(np.clip(h0[-1], lo, hi)), float(np.clip(h1[-1], lo, hi))], 0.18 * (hi - lo))):
+            a.text(1.02, yl, lab, fontsize=self.fs(10), color=T["ink2"], va="center", transform=a.get_yaxis_transform())
+        a.grid(axis="x", visible=False)
+        self._axis_style(a)
+        self.text(fig, x1 - 80, y0, f"bed 1 {n0:+.2f}   bed 2 {n1:+.2f}", size=11.5, ha="right", fontweight="bold")
 
     def _colour_keys(self, fig):
         """The bed-colour keys (loading ramps) at the left edge."""

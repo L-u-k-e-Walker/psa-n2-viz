@@ -97,3 +97,20 @@ standard for the 30 SLPM product.
 The center charts show the gas concentration of each species along the whole bed, normalized by its feed
 concentration: C_i / C_i,in with C_i,in = y_i,feed p_feed / (R T). Values above 1 occur for N2 (and Ar) near
 the product end, where the gas is enriched in N2 at nearly the feed pressure.
+
+## Heat of adsorption shown in the visual (psan2viz/thermal.py)
+
+The model is isothermal (user decision); temperature is not simulated. The thermal chart shows the heat each bed's
+sorbent releases on uptake and takes up on release, Q = sum dH_i m_cell dq_i/dt from the solver's own uptake rates; in
+the isothermal model it is assumed exchanged with the bed and the column wall. The adiabatic swing quoted on the chart
+is the range of the cumulative heat over a cycle divided by the sorbent heat capacity (an estimate, not simulated).
+
+| Quantity | Value | Source class |
+|---|---|---|
+| dH O2, N2 on CMS | 15 kJ/mol | assumed constant from M21d Fig. 3.4-1 / Tab. 3.4-1 (Clausius-Clapeyron on CT-350: <= 17 kJ/mol at minimum loading, falling with loading) |
+| dH Ar on CMS | 15 kJ/mol | assumed = O2 (as the isotherm) |
+| dH CO2, H2O on CMS | 25, 44 kJ/mol | assumed (typical for carbons; heat of vaporization); traces on the CMS |
+| dH N2, O2, Ar on alumina | 15 kJ/mol | the model's own assumption (alumina isotherm moved to 293 K with 15 kJ/mol) |
+| dH CO2 on alumina | 33 kJ/mol | mean of the fitted site heats 39.5 / 27.0 kJ/mol (ISODB 10.1007/s10450-017-9907-0, 273/303 K) |
+| dH H2O on alumina | 44.2 kJ/mol | heat of vaporization at 20 degC (IF97), implied by the model's RH-only temperature shift of the water isotherm |
+| Sorbent heat capacity | 880 J/(kg K) | M21d (CMS); assumed for the alumina too |

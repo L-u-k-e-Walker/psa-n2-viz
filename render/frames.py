@@ -77,6 +77,7 @@ def frame_cache(timing, css_dir=CSS_DIR, cache_dir=HERE / "cache", log=print):
     tm = TimeMap(cyc.case.t_half, timing["half_cycle_knots"], timing["half_video_knots"])
     if path.exists():
         d = dict(np.load(path, allow_pickle=False))
+        d.update(thermal_traces(css_dir, d, cache_dir, log))
         return d, tm, cyc
     n = int(round(tm.video_s * FPS_TIMELINE))
     tv = np.arange(n) / FPS_TIMELINE
@@ -115,4 +116,22 @@ def frame_cache(timing, css_dir=CSS_DIR, cache_dir=HERE / "cache", log=print):
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, **out)
     log(f"frame cache written: {path.name} ({n} frames)")
-    return dict(np.load(path, allow_pickle=False)), tm, cyc
+    d = dict(np.load(path, allow_pickle=False))
+    d.update(thermal_traces(css_dir, d, cache_dir, log))
+    return d, tm, cyc
+
+
+def thermal_traces(css_dir, d, cache_dir=HERE / "cache", log=print):
+    """Heat of adsorption/desorption of each bed at the power-chart sample times (psan2viz.thermal), in a
+    side cache keyed by the frame cache (so the frame cache and the molecule history stay valid)."""
+    from psan2viz.thermal import heat_rates, sorbent_heat_capacity
+    path = Path(cache_dir) / f"thermal_{str(d['cache_key'])}.npz"
+    if not path.exists():
+        cyc = load_cycle(css_dir, integrate=True)
+        ts = d["power_t"]
+        q = np.array([heat_rates(cyc.pl, cyc.state(min(float(t), cyc.T))[0]) for t in ts])
+        np.savez_compressed(path, heat_t=ts, heat0=q[:, 0], heat1=q[:, 1],
+                            heat_cap=np.array(sorbent_heat_capacity(cyc.pl)))
+        log(f"thermal traces written: {path.name}")
+    t = dict(np.load(path))
+    return {k: t[k] for k in ("heat_t", "heat0", "heat1", "heat_cap")}

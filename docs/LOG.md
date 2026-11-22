@@ -327,3 +327,11 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   state back to 1.2e-5. Fixed: no jumps within 5x the march target, at most 1,500 cycles per jump.
 - phase1_final.py now converges the 360-cell trace profiles (trace_css.py from model/grid/2N -> model/css/final),
   then gates, Gate 3, DESIGN.md and the HD draft.
+
+### Argon profile bump (user question, 2026-11-22)
+- The dashed Ar line in the center charts shows a smooth bump, e.g. bed 1 during pressurization (t = 3.5 s): y_Ar
+  rises to 1.21 % at z/L ~0.32, dips to 1.11 % at 0.41, then rises to ~1.2 % at the top; 3 extrema over 190 cells, no
+  cell-to-cell zigzag, so it is not a numerical oscillation (first-order upwind is monotone anyway). It is a roll-up
+  at the O2 front: Ar is modelled with O2's equilibrium but N2's slow kinetics, so when the CMS strips O2 fast, the
+  Ar is left in the gas and enriches just ahead of the front (like N2), while the gas above it came in from the top
+  with the product back-flow (~1.2 % Ar).
