@@ -2,12 +2,26 @@
 
 A rendered visual of a two-bed carbon-molecular-sieve (CMS) PSA unit making N₂ from compressed
 air (N₂, O₂, Ar, CO₂, H₂O): two 3D packed beds, a piping and valve schematic with flows, and live
-plots, at cyclic steady state, as a seamless loop. **Work in progress**: see docs/MISSION.md (plan,
-decisions, gates), docs/LOG.md (evidence), docs/REVIEWS.md (review history).
+plots, at cyclic steady state, as a seamless 60 s loop. Plan and decisions: docs/MISSION.md; evidence:
+docs/LOG.md; review history: docs/REVIEWS.md; inputs and sources: docs/INPUTS.md; final design: docs/DESIGN.md.
+
+**Final render (v24):** `final/psa_n2_white.mp4` (1920x1080, 30 fps, 60 s) and `final/psa_n2_white.gif`
+(1280x720, 15 fps). What the frame shows:
+- the two beds (3D packed pellets coloured by how much O2 the CMS and how much water the alumina hold, gas molecules
+  drifting with the flow) and the piping as tubes with the gas moving through them (dot density follows the line
+  pressure, colours the computed composition; spool valves glide when they switch);
+- an outlet analyzer per bed (N2, Ar, O2 of the gas leaving it);
+- one chart per bed: the partial pressure of every species along the bed, normalized by the feed (p/p_in);
+- steps and valve timing, pressures, the feed compressor's ideal isothermal power, the heat of adsorption and
+  desorption of each bed, and the product and energy figures (30 SLPM at 3,154 ppm O2, 89 SLPM feed air,
+  319 W = 0.177 Wh per L N2).
+- Physics: 30 + 360 cells (first-order upwind); grid check G1e not met (180 vs 360 cells: 4,435 vs 3,122 ppm;
+  extrapolated ~2,200 ppm), the 360-cell state is the final state (user decision, docs/LOG.md).
 
 **Nothing here is measured.** Every input is a literature value (cited), a fit to literature data,
 a calculation from those, or an assumption with its reason (docs/INPUTS.md). The motion is computed,
-not scripted: every colour, profile, count and curve comes from the solver in `psan2viz/`.
+not scripted: every color, profile, count and curve comes from the solver in `psan2viz/` (the one cosmetic
+exception, valve motion over 0.3 s of video, is stated in the footnote).
 
 ## What is simulated
 
