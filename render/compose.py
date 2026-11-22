@@ -80,8 +80,9 @@ LAYOUTS = {
         outer_dx=40, tee_feed_x=600, tee_vent_x=720, tee_prod_x=600, tee_purge_x=720,
         train_x=20, train="compact", receiver=(1236, 86, 1284, 186), silencer_x=1130,
         analyzer_w=172, analyzer_h=72, analyzer_gap=52,
-        timing=(1330, 52, 1890, 330), pressure=(1330, 396, 1890, 636),  # no product-O2 panel (user, v10 review)
-        readouts=(1330, 664), footnote=(36, 1072)),
+        timing=(1330, 52, 1890, 330), pressure=(1330, 372, 1890, 548),  # no product-O2 panel (user, v10 review)
+        power=(1330, 588, 1890, 762),  # feed-compressor power over the cycle (user, v18 review)
+        readouts=(1330, 800), footnote=(36, 1072), colour_keys=(20, 560)),
     "C": dict(  # wide plant on top with profile strips, a strip of time panels along the bottom
         name="plant on top, time strip below", eq_x=985, title=(36, 24), legend=(36, 300),
         beds=[(560, 215, 660, 612), (1110, 215, 1210, 612)], prof="pairs", label_side=["left", "left"],
@@ -202,7 +203,12 @@ class Composer:
             if "o2" in self.L:
                 self._o2(fig, fr)
             self._readouts(fig, fr)
-            self._legend(fig)
+            if "power" in self.L:
+                self._power(fig, fr)
+            if "colour_keys" in self.L:
+                self._colour_keys(fig)
+            else:
+                self._legend(fig)
             self._title(fig, fr)
             if "clock" in self.L:
                 self._clock(fig, fr)
@@ -1234,7 +1240,7 @@ class Composer:
         a.set(xlim=(0, 1.3), ylim=(0, 1), xticks=[0, 0.5, 1.0], yticks=[0, 0.5, 1])
         a.set_xticklabels(["0", "0.5", "1"])
         a.set_ylabel("height  z / L", fontsize=self.fs(11))
-        a.set_xlabel("C / C$_{in}$  (feed = 1)", fontsize=self.fs(11))
+        a.set_xlabel("p / p$_{in}$   partial pressure (feed = 1)", fontsize=self.fs(10.5))
         self._axis_style(a)
         a.text(0.98, 0.5 * self.z_al, "alumina", transform=a.get_yaxis_transform(), ha="right", va="center",
                fontsize=self.fs(9), color=T["ink2"])
@@ -1397,9 +1403,55 @@ class Composer:
         self.text(fig, x, y, "Product and energy (SLPM at 21.1 °C, 1 atm)", size=13, fontweight="bold")
         for i, (k, v) in enumerate(rows):
             small = k == ""
-            self.text(fig, x, y + 28 + i * 20, k, size=11.5, color=T["ink2"])
-            self.text(fig, x + 128, y + 28 + i * 20 - (3 if small else 0), v, size=9.5 if small else 11.5,
+            self.text(fig, x, y + 28 + i * 19, k, size=11.5, color=T["ink2"])
+            self.text(fig, x + 128, y + 28 + i * 19 - (3 if small else 0), v, size=9.5 if small else 11.5,
                       color=T["muted"] if small else T["ink"])
+
+    def _power(self, fig, fr):
+        """Instantaneous compression power of the feed air drawn from the header (user, v18 review):
+        P(t) = F_feed(t) R T ln(p_header / p_atm), ideal isothermal; dashed: the cycle mean."""
+        T = self.T
+        x0, y0, x1, y1 = self.L["power"]
+        a = self.box_axes(fig, (x0 + 40, y0 + 44, x1 - 80, y1))
+        self.text(fig, x0, y0, "Feed compressor power (kW)", size=13, fontweight="bold")
+        self.text(fig, x0, y0 + 21, "ideal isothermal, of the air drawn from the header; dashed: cycle mean",
+                  size=10, color=T["muted"])
+        cs = self.cyc.pl.case
+        w_mol = 8.314462618 * float(cs.grid.T) * math.log(float(cs.p_feed) / 1.01325)  # J per mol of air
+        d = self.d
+        tt = d["power_t"] / self.t_cycle
+        pw = d["power_Ffeed"] * w_mol / 1000.0
+        mean = performance(self.met, cs)["pressure_work_w"] / 1000.0
+        a.fill_between(tt, 0, pw, color=T["ink2"], alpha=0.12, lw=0)
+        a.plot(tt, pw, color=T["ink"], lw=1.6 * self.s)
+        a.axhline(mean, color=T["muted"], lw=1.2 * self.s, ls=(0, (4, 3)))
+        now = (float(fr["F0_feed"]) + float(fr["F1_feed"])) * w_mol / 1000.0
+        a.plot([fr["frac"]], [now], "o", ms=6 * self.s, color=T["ink"], mec=T["bg"], mew=1.2 * self.s)
+        top = max(1.08 * float(pw.max()), 2.5 * mean)
+        a.set(xlim=(0, 1), ylim=(0, top), xticks=[0, 0.5, 1])
+        a.text(1.02, mean, f"mean {mean:.2f}", fontsize=self.fs(10), color=T["ink2"], va="center",
+               transform=a.get_yaxis_transform())
+        a.text(1.02, min(now, 0.92 * top), f"{now:.2f}", fontsize=self.fs(10), color=T["ink"], va="center",
+               fontweight="bold", transform=a.get_yaxis_transform())
+        a.grid(axis="x", visible=False)
+        self._axis_style(a)
+
+    def _colour_keys(self, fig):
+        """The bed-colour keys (loading ramps) at the left edge."""
+        T = self.T
+        x, y = self.L["colour_keys"]
+        self.text(fig, x, y, "bed colours", size=10.5, fontweight="bold", color=T["ink2"])
+        for j, (rmp, lab) in enumerate(((self.ramp_cms, "CMS: O$_2$ held"), (self.ramp_al, "alumina: H$_2$O held"))):
+            yy = y + 24 + j * 52
+            self.text(fig, x, yy, lab, size=10, color=T["ink2"])
+            ax = fig.add_axes([self.fx(x + 2), self.fy(yy + 28), 120 / W, 9 / H])
+            ax.imshow(rmp[None], aspect="auto", extent=(0, 1, 0, 1))
+            ax.set_xticks([0, 1])
+            ax.set_xticklabels(["0", "q$_{feed}$"])
+            ax.set_yticks([])
+            ax.tick_params(length=0, labelsize=self.fs(9), pad=1)
+            for sp_ in ax.spines.values():
+                sp_.set_visible(False)
 
     def _legend(self, fig):
         T = self.T

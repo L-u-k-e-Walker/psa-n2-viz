@@ -27,7 +27,7 @@ from psan2viz.analysis import Cycle  # noqa: E402
 
 CSS_DIR = ROOT / "model" / "css" / "final"
 FPS_TIMELINE = 30  # frame states are always computed on the final's timeline
-CACHE_VERSION = 4  # bump when the cached fields change
+CACHE_VERSION = 5  # bump when the cached fields change
 
 
 class TimeMap:
@@ -96,6 +96,13 @@ def frame_cache(timing, css_dir=CSS_DIR, cache_dir=HERE / "cache", log=print):
     out["trace_yT"] = np.stack([f["y_tank"] for f in fr])
     out["trace_y0_top"] = np.stack([f["y0"][:, -1] for f in fr])
     out["trace_y1_top"] = np.stack([f["y1"][:, -1] for f in fr])
+    # feed flow over the cycle for the compressor-power chart, dense at the start of each step (the
+    # pressurization spike lasts well under a second)
+    tp = np.concatenate([cyc.starts[i] + d_ * np.linspace(0.0, 1.0, 300, endpoint=False) ** 2.5
+                         for i, d_ in enumerate(cyc.dur)] + [[cyc.T]])
+    frp = [cyc.frame(t) for t in tp]
+    out["power_t"] = tp
+    out["power_Ffeed"] = np.array([f["F0_feed"] + f["F1_feed"] for f in frp])
     out["z"] = cyc.z
     out["z_faces"] = cyc.pl.g.z_faces / cyc.pl.g.length
     out["z_al"] = np.array(cyc.z_al)
