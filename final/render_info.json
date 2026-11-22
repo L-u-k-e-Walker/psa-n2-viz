@@ -1,7 +1,7 @@
 {
  "tier": "final",
- "version": "v24",
- "config_hash": "68bafcf9",
+ "version": "v25",
+ "config_hash": "b6755a23",
  "themes": {
   "white": {
    "frames": 1800,
@@ -12,9 +12,9 @@
     0,
     0
    ],
-   "wall_frames_s": 690.3,
-   "gif_note": "GIF downscaled to 1280 px wide (39.0 MB; 1920 px would exceed 50 MB)"
+   "wall_frames_s": 707.5,
+   "gif_note": "GIF downscaled to 1280 px wide (45.8 MB; 1920 px would exceed 50 MB)"
   }
  },
- "wall_s": 738.4
+ "wall_s": 761.6
 }

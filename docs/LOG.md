@@ -347,3 +347,7 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   versioned folders.)
 - The Phase 1 gate run on the 360-cell final (gates_phase1.py) was killed after 6 h (signal 9, most likely memory while
   render workers ran beside it); the gates and Gate 3 still need a run on their own.
+- Final **v25** (user: "final v25"; v24 superseded: gas molecules in the columns too faint -> drawn 1.6x larger, N2 not
+  lightened in the beds): 1800 frames in 708 s (762 s in all), final/psa_n2_white.mp4 (1920x1080, 30 fps, 60.0 s,
+  34.1 MB) and final/psa_n2_white.gif (1280x720 at 15 fps, 45.8 MB). **Gate 4 PASS** (docs/gate4_qc.json). The gate run
+  was stopped for the render (it held 9.8 GB; render workers need ~10 GB) and still has to be rerun on its own.

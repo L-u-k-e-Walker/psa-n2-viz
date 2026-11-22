@@ -5,7 +5,7 @@ air (N₂, O₂, Ar, CO₂, H₂O): two 3D packed beds, a piping and valve schem
 plots, at cyclic steady state, as a seamless 60 s loop. Plan and decisions: docs/MISSION.md; evidence:
 docs/LOG.md; review history: docs/REVIEWS.md; inputs and sources: docs/INPUTS.md; final design: docs/DESIGN.md.
 
-**Final render (v24):** `final/psa_n2_white.mp4` (1920x1080, 30 fps, 60 s) and `final/psa_n2_white.gif`
+**Final render (v25):** `final/psa_n2_white.mp4` (1920x1080, 30 fps, 60 s) and `final/psa_n2_white.gif`
 (1280x720, 15 fps). What the frame shows:
 - the two beds (3D packed pellets coloured by how much O2 the CMS and how much water the alumina hold, gas molecules
   drifting with the flow) and the piping as tubes with the gas moving through them (dot density follows the line
