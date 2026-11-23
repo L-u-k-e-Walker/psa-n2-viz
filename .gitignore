@@ -19,3 +19,4 @@ model/**/runs/
 model/**/runs_*/
 model/sizing/*.npy
 model/phase1_final.draft_done
+psa-n2-viz_prompt.md
