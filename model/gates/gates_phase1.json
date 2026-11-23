@@ -1,0 +1,103 @@
+{
+ "G1a": {
+  "css_cycle": {
+   "system": 6.625188016659013e-14,
+   "per_bed": 6.03313541769412e-14,
+   "receiver": 1.0826181215495471e-14,
+   "system_per_component": {
+    "N2": 1.0826181215495471e-14,
+    "O2": 1.1334744872646562e-15,
+    "Ar": 6.553350820662299e-15,
+    "CO2": 2.4132333785187387e-15,
+    "H2O": 6.625188016659013e-14
+   }
+  },
+  "startup_cycles_max": 8.116149375701058e-13,
+  "limit": 0.0001,
+  "pass": true
+ },
+ "G1b": {
+  "css_change_rms": 1.0413209225938978e-05,
+  "css_change_max": 0.0001976863246948475,
+  "limit": 1e-06,
+  "cycle_balance_per_component": {
+   "N2": 7.32588899299242e-06,
+   "O2": 1.3199436606260111e-05,
+   "Ar": 1.8559545848552287e-06,
+   "CO2": 3.953093729209962e-05,
+   "H2O": 0.017401410509854623
+  },
+  "cycle_balance_limit": 0.005,
+  "pass": false
+ },
+ "G1d": {
+  "max_scaled_diff": 0.00010618527428824949,
+  "limit": 0.0001,
+  "pass": false
+ },
+ "G1e": {
+  "N": [
+   180,
+   360
+  ],
+  "product_O2_ppm": [
+   4434.918623548879,
+   3122.3957572980876
+  ],
+  "recovery_N2": [
+   0.4248947890478083,
+   0.42540561258016013
+  ],
+  "d_O2_rel": 0.29595196161694026,
+  "d_recovery_pp": 0.05108235323518229,
+  "limits": {
+   "d_O2_rel": 0.05,
+   "d_recovery_pp": 1.0
+  },
+  "O2_extrapolated_ppm": 2198.316607981307,
+  "note": "failed; user decision: the 360-cell state is the final state, G1e reported as not met",
+  "pass": false
+ },
+ "G1f": {
+  "product_O2_ppm": 3148.1723105625288,
+  "O2_limit_ppm": 5000.0,
+  "air_factor": 2.968067987465883,
+  "air_factor_band": [
+   2.0,
+   3.5
+  ],
+  "h2o_loading_front_zL": 0.07392304475115016,
+  "alumina_top_zL": 0.12672521957340027,
+  "h2o_on_cms_max_rel_to_feed_eq": 7.44248007239369e-05,
+  "h2o_interface_y_rel_during_production": 8.98465134165173e-05,
+  "product_CO2_ppm": 3.430241751878332e-05,
+  "product_H2O_ppm": 1.915843386719544e-07,
+  "eq_residual": [
+   0.03438242849047961,
+   0.0343829370036141
+  ],
+  "eq_limit": 0.05,
+  "p_tank_min_bar": 7.516143871873297,
+  "p_deliver_bar": 7.01325,
+  "product_Ar_pct": 1.1956431535358338,
+  "N2_excl_Ar_pct": 98.4895396119585,
+  "recovery_N2": 0.42538808719724536,
+  "productivity_Nm3_h_m3": 117.5668166360993,
+  "checks": {
+   "O2": true,
+   "air_factor": true,
+   "h2o_in_alumina": true,
+   "co2_negligible": 1.0,
+   "eq_nearly_equal": 1.0,
+   "regulator_supplied": true
+  },
+  "pass": true
+ },
+ "psa_sim_crosscheck": "skipped: psa-sim supports several columns, equalization and >2 components, but not this case (no simultaneous top+bottom equalization, no layered bed, no bidirectional product valve / back-flow, no Darken LDF); per docs/MISSION.md",
+ "G1c": {
+  "source": "model/regression/g1c.json",
+  "max_diff_rtol_1e-9": 7.010705121990313e-08,
+  "pass": true
+ },
+ "all_pass": false
+}

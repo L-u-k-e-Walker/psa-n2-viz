@@ -1,13 +1,13 @@
 {
- "css_state": "model/sizing/runs_n60b/iter01",
+ "css_state": "model/css/final",
  "frames": {
-  "frame 63 (t = 2.20 s)": 0.0,
-  "frame 369 (t = 46.37 s)": 0.0,
-  "frame 747 (t = 94.26 s)": 0.0
+  "frame 126 (t = 0.28 s)": 1.4973133843909636e-11,
+  "frame 738 (t = 33.00 s)": 2.584657030624271e-07,
+  "frame 1494 (t = 74.72 s)": 1.3036671404620392e-06
  },
- "max_abs_diff": 0.0,
+ "max_abs_diff": 1.3036671404620392e-06,
  "limit": 1e-06,
- "loop_seam_rms": 3.753891462541425e-05,
- "loop_seam_max": 0.0005474556426958643,
+ "loop_seam_rms": 1.0413209225938978e-05,
+ "loop_seam_max": 0.0001976863246948475,
  "pass": false
 }

@@ -149,7 +149,7 @@ commit. Ask before pushing.
 
 ## Status (2026-11-22)
 - Phase 0: done. Phase 1: physics done; final state = 360 CMS + 60 alumina cells (user decision after G1e failed;
-  docs/LOG.md); gate results in model/gates/gates_phase1.json (G1e and G1b reported as not met, with numbers).
+  docs/LOG.md); gates: G1a, G1c, G1f pass; G1b, G1d, G1e and Gate 3 not met (residual water drift, grid), docs/LOG.md.
 - Phases 2-3: layout and look settled over drafts v01-v25 (docs/REVIEWS.md): layout F, white only, Inter.
 - Phase 4: final v25 rendered (user: "final v25"), Gate 4 pass: final/psa_n2_white.mp4 (1080p30, 60 s) and .gif (720p15).
 - Phase 5: README and ../CLAUDE.md updated; main pushed to git@github.com:L-u-k-e-Walker/psa-n2-viz.git.

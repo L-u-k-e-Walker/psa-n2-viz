@@ -351,3 +351,17 @@ vectors differ in length, so the error norms pick different steps). Trace specie
   lightened in the beds): 1800 frames in 708 s (762 s in all), final/psa_n2_white.mp4 (1920x1080, 30 fps, 60.0 s,
   34.1 MB) and final/psa_n2_white.gif (1280x720 at 15 fps, 45.8 MB). **Gate 4 PASS** (docs/gate4_qc.json). The gate run
   was stopped for the render (it held 9.8 GB; render workers need ~10 GB) and still has to be rerun on its own.
+
+## Phase 1 gates on the final 360-cell state (run alone, 2026-11-22/23)
+- gates_phase1.py (model/gates/gates_phase1.json): **G1a PASS** (mass balances), **G1c PASS** (psa-viz regression),
+  **G1f PASS** (sanity: O2 <= 0.5 %, air factor 2.97 in band, water held by the alumina, CO2 negligible, equalized
+  pressures), **G1b not met** (full-cycle change 1.0e-5 rms / 2.0e-4 max vs 1e-6; balances N2/O2/Ar/CO2 <= 4e-5, H2O
+  -1.7 %: the alumina is still drying slowly), **G1d not met** (bed symmetry 1.06e-4 vs 1e-4, a consequence of the
+  same residual drift), **G1e not met** (180 vs 360 cells: 4,435 vs 3,122 ppm; extrapolated ~2,200 ppm; user chose
+  the 360-cell state).
+- Gate 3 (docs/gate3_final.json): plotted values vs an independent re-integration differ by at most 1.3e-6 (limit
+  1e-6, integrator-noise level); loop seam 2.0e-4 (limit 1e-4) = the same unconverged water drift. Not met as
+  written; nothing visible depends on it (product, pressures, power, heat and the N2/O2 profiles are settled far
+  below these levels).
+- Everything that misses traces to one cause: the trace water profile in the alumina was not marched to full CSS at
+  360 cells (more rounds of model/css/trace_css.py would close G1b, G1d and the seam).
